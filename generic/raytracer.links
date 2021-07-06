@@ -334,7 +334,9 @@ fun castRays((camera,lights,objects,width,height) as scene) {
   reverse(rows(rayPoint, 0.0, width, height, []))
 }
 
-# The initial configuration
+#
+# The initial configuration.
+#
 sig camera : Camera
 var camera = ( (0.0,1.8,10.0)
              , 45.0
