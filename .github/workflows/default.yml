@@ -2,9 +2,9 @@ name: Typecheck Links benchmark suite
 
 on:
   pull_request:
-    branches: master
+    branches: main
   push:
-    branches: master
+    branches: main
   schedule:
     # Prime the caches every Monday
     - cron: 0 1 * * MON
