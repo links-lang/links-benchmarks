@@ -1,0 +1,436 @@
+# Ray tracing
+# Based on Tom MacWright's "literate-raytracer" (https://github.com/tmcw/literate-raytracer).
+# Uses: lists, tuples, closed variants, and first-class functions.
+
+# Auxiliary data types and functions.
+typename Option(a) = [|None|Some:a|];
+
+sig min : (a,a) -> a
+fun min(x,y) { if (y > x) x else y }
+
+# Like iteri, but with a float index rather than integer index.
+sig iterif : ((a, Float) ~e~> (), List(a)) ~e~> ()
+fun iterif(f, xs) {
+  fun loop(f, xs, i) {
+    switch (xs) {
+      case [] -> ()
+      case x :: xs -> f(x, i); loop(f, xs, i +. 1.0)
+    }
+  }
+  loop(f, xs, 0.0)
+}
+
+sig pi : Float
+var pi = 3.14159265359;
+
+typename Matrix2D(a) = List(List(a));
+
+module Vec3 {
+  typename T = ( Float   # x
+               , Float   # y
+               , Float); # z
+
+  # Constants
+  sig up : T
+  var up = (0.0, 1.0, 0.0);
+
+  # Operations
+  sig add : (T, T) -> T
+  fun add((x1,y1,z1),(x2,y2,z2)) {
+    (x1 +. x2, y1 +. y2, z1 +. z2)
+  }
+
+  sig add3 : (T, T, T) -> T
+  fun add3((x1,y1,z1),(x2,y2,z2),(x3,y3,z3)) {
+    (x1 +. x2 +. x3, y1 +. y2 +. y3, z1 +. z2 +. z3)
+  }
+
+  sig sub : (T, T) -> T
+  fun sub((x1,y1,z1),(x2,y2,z2)) {
+    (x1 -. x2, y1 -. y2, z1 -. z2)
+  }
+
+  # Dot product
+  sig dot : (T, T) -> Float
+  fun dot((x1,y1,z1),(x2,y2,z2)) {
+    x1 *. x2 +. y1 *. y2 +. z1 *. z2
+  }
+
+  # Cross product
+  sig cross : (T, T) -> T
+  fun cross((x1,y1,z1),(x2,y2,z2)) {
+     ( (y1 *. z2) -. (z1 *. y2)
+     , (z1 *. x2) -. (x1 *. z2)
+     , (x1 *. y2) -. (y1 *. x2) )
+  }
+
+  # Scalar multiplication
+  sig scale : (T, Float) -> T
+  fun scale((x,y,z),s) {
+    (x *. s, y *. s, z *. s)
+  }
+
+  # Computes the magnitude (or length) of a given vector
+  sig magnitude : (T) -> Float
+  fun magnitude(v) {
+    sqrt(dot(v,v))
+  }
+
+  # Computes the unit vector from a given vector `v` such that
+  # magnitude(unit(v)) ~= 1.0.
+  sig unit : (T) -> T
+  fun unit(v) {
+    scale(v, 1.0 /. magnitude(v))
+  }
+
+  # This operation computes the reflection off some vector `v` that
+  # hits some surface at angle `normal`.
+  sig reflect : (T, T) -> T
+  fun reflect(v, normal) {
+    var d = scale(normal, dot(v, normal));
+    sub(scale(d, 2.0), v)
+  }
+}
+
+# Colours are just aliases of vectors.
+module RGB {
+  typename T = Vec3.T;
+
+  sig white : T
+  var white = (255.0, 255.0, 255.0);
+
+  sig black : T
+  var black = (0.0, 0.0, 0.0);
+
+  sig phobos : T
+  var phobos = (65.0, 105.0, 225.0); # Phobos is actually red, but
+                                     # let's make it blue.
+
+  sig deimos : T
+  var deimos = (255.0,250.0,205.0);
+
+  sig mars : T
+  var mars = (173.0, 98.0, 66.0);
+
+  # Produces a "canvas fill style" compatible string.
+  sig toString : (Vec3.T) -> String
+  fun toString((x,y,z)) {
+    sig to255 : (Float) -> Int
+    fun to255(v) {
+      var v' = floatToInt(floor(v));
+      if (v' > 255) 255
+      else if (v' < 0) 0
+      else v'
+    }
+
+    "rgb(" ^^ intToString(to255(x)) ^^ ", "
+           ^^ intToString(to255(y)) ^^ ", "
+           ^^ intToString(to255(z)) ^^ ")"
+  }
+}
+
+#
+# Core structures: camera, lights, objects, and scene.
+#
+
+# The camera is our point of view from which we cast rays onto the
+# scene.
+typename Camera = ( Vec3.T    # point in space
+                  , Float     # field of view
+                  , Vec3.T ); # angle from the right to left
+
+# A ray is a pair of vectors which describe the origin and direction
+# of the ray.
+typename Ray = ( Vec3.T    # origin
+               , Vec3.T ); # direction
+
+# Lights are points in space. Surfaces that have Lambert shading will
+# be affected by visible light.
+typename Light = Vec3.T;
+typename Lights = List(Light);
+
+# A sphere is an object in space that can be hit by rays.
+module Sphere {
+  typename T = ( Vec3.T   # point
+               , RGB.T    # colour
+               , Float    # specular
+               , Float    # lambert shading
+               , Float    # ambient
+               , Float ); # radius
+
+  # Detects collisions of a ray against a given sphere.
+  sig detectCollision : (T, Ray) -> Option(Float)
+  fun detectCollision(sphere, (rorigin,rdirection)) {
+    var eyeToCenter = Vec3.sub(sphere.1, rorigin);
+    var v = Vec3.dot(eyeToCenter, rdirection);
+    var discriminant = sphere.6 *. sphere.6 -. Vec3.dot(eyeToCenter, eyeToCenter) +. v *. v;
+    # A negative discriminant means that the sphere was not hit by the
+    # ray. Otherwise, this function returns the distance from the
+    # camera point to the sphere.
+    if (discriminant < 0.0) None
+    else Some(v -. sqrt(discriminant))
+  }
+
+  # A normal is a vector that's perpendicular to the surface of some
+  # object and radiates outward.
+  sig normal : (T, Vec3.T) -> Vec3.T
+  fun normal(sphere, position) {
+    Vec3.unit(Vec3.sub(position, sphere.1))
+  }
+}
+
+module Scene {
+  typename T = ( Camera           # point of view
+               , Lights           # points in space
+               , List(Sphere.T)   # objects in space
+               , Float            # width
+               , Float );         # height
+
+  # Attempts to intersect a given ray with the objects (spheres) in
+  # space. Returns either `None`, if the ray does not intersect with
+  # any object, or `Some` pair, where the first component is the
+  # distance to the object and the second component is the closest
+  # object intersecting with the ray.
+  sig intersect : (Ray, T) ~> Option((Float, Sphere.T))
+  fun intersect(ray, scene) {
+    sig findClosest : (Option((Float, Sphere.T)), List(Sphere.T)) ~> Option((Float, Sphere.T))
+    fun findClosest(closest, spheres) {
+      switch (spheres) {
+        case []    -> closest
+        case sphere :: spheres ->
+          switch (Sphere.detectCollision(sphere, ray)) {
+            case None -> findClosest(closest, spheres)
+            case Some(dist) ->
+              switch (closest) {
+                case None -> findClosest(Some((dist,sphere)), spheres)
+                case Some((dist', _)) ->
+                  if (dist < dist') findClosest(Some((dist,sphere)), spheres)
+                  else findClosest(closest, spheres)
+              }
+          }
+      }
+    }
+    findClosest(None, scene.3)
+  }
+}
+
+mutual {
+  # This function attempts to repeatedly shoot a given ray in order to
+  # hit an object. If an object is hit it returns that object's
+  # colour, otherwise if no object is hit it returns `RGB.white`. This
+  # function is mutually recursive with `surface` (defined below), the
+  # third parameter `depth` controls the level of recursion, if that
+  # level is exceeded this function will return `RGB.black`.
+  sig trace : (Ray, Scene.T, Int) ~> RGB.T
+  fun trace(ray, scene, depth) {
+    if (depth > 3) RGB.black
+    else {
+      switch (Scene.intersect(ray, scene)) {
+        case None -> RGB.white
+        case Some((dist,obj)) ->
+          var pointAtTime = Vec3.add(ray.1, Vec3.scale(ray.2, dist));
+          surface(ray, scene, obj, pointAtTime, Sphere.normal(obj, pointAtTime), depth+1)
+      }
+    }
+  }
+
+  # This function is called if `trace` determines that a ray has hit
+  # an object. This function determines the colour the object acquires
+  # from the interaction.
+  sig surface : (Ray, Scene.T, Sphere.T, Vec3.T, Vec3.T, Int) ~> RGB.T
+  fun surface(ray, scene, sphere, point, normal, depth) {
+
+    # Checks whether a light is visible from some point on the surface
+    # of an object.
+    sig isLightVisible : (Vec3.T) ~> Bool
+    fun isLightVisible(light) {
+      var ray = (point, Vec3.unit(Vec3.sub(point, light)));
+      switch (Scene.intersect(ray, scene)) {
+        case None -> false
+        case Some((dist,_)) -> dist > -.0.005 # the light may
+                                              # intersect with the
+                                              # surface.
+      }
+    }
+
+    # Lambert shading shows gradations from the most lit point on the
+    # object to the least lit point.
+    sig lambertShading : (Lights) ~> Float
+    fun lambertShading(lights) {
+      fold_left(fun(lambertAmount, lightPoint) {
+         if (isLightVisible(lightPoint)) {
+           var contribution = Vec3.dot(Vec3.unit(Vec3.sub(lightPoint, point)), normal);
+           if (contribution > 0.0) lambertAmount +. contribution else lambertAmount
+         } else lambertAmount
+      }, 0.0, lights)
+    }
+
+    # Compute the specular reflection.
+    var reflectedRay = (point, Vec3.reflect(ray.2, normal));
+    var reflectedColour = trace(reflectedRay, scene, depth);
+    var c = Vec3.add(RGB.black, Vec3.scale(reflectedColour, sphere.3));
+
+    var lambertAmount = min(1.0,lambertShading(scene.2));
+
+    # Adds Lambert shading and ambient colours, which shine bright
+    # regardless of whether there is a light visible.
+    Vec3.add3( c
+             , Vec3.scale(sphere.2, lambertAmount *. sphere.4)
+             , Vec3.scale(sphere.2, sphere.5) )
+
+  }
+}
+
+# Shoots rays onto the scene.
+sig castRays : (Scene.T) ~> Matrix2D(Vec3.T)
+fun castRays((camera,lights,objects,width,height) as scene) {
+  var eyeVector = Vec3.unit(Vec3.sub(camera.3, camera.1));
+  var vpRight   = Vec3.unit(Vec3.cross(eyeVector, Vec3.up));
+  var vpUp      = Vec3.unit(Vec3.cross(vpRight, eyeVector));
+
+  var fovRadians = (pi *. (camera.2 /. 2.0)) /. 180.0;
+  var heightWidthRatio = height /. width;
+  var halfWidth = tan(fovRadians);
+  var halfHeight = heightWidthRatio *. halfWidth;
+  var cameraWidth = halfWidth *. 2.0;
+  var cameraHeight = halfHeight *. 2.0;
+  var pixelWidth  = cameraWidth /. (width -. 1.0);
+  var pixelHeight = cameraHeight /. (height -. 1.0);
+
+  var rayPoint = camera.1;
+
+  # Samples the colour of a single pixel.
+  sig sample : (Float, Float, Vec3.T) ~> RGB.T
+  fun sample(x, y, rayPoint) {
+     var xcomp = Vec3.scale(vpRight, x *. pixelWidth -. halfWidth);
+     var ycomp = Vec3.scale(vpUp, y *. pixelHeight -. halfHeight);
+     var ray = (rayPoint, Vec3.unit(Vec3.add3(eyeVector, xcomp, ycomp)));
+     trace(ray, scene, 0)
+  }
+
+  # Computes the samples of each component of a row.
+  sig columns : (Vec3.T, Float, Float, Float, List(RGB.T)) ~> List(RGB.T)
+  fun columns(rayPoint, x, y, width, acc) {
+    if (x < width) columns( rayPoint
+                          , x +. 1.0
+                          , y
+                          , width
+                          , sample(x, y, rayPoint) :: acc )
+    else acc
+  }
+
+  # Computes the samples of each row.
+  sig rows : (Vec3.T, Float, Float, Float, Matrix2D(RGB.T)) ~> Matrix2D(RGB.T)
+  fun rows(rayPoint, y, width, height, acc) {
+    if (y < (height +. 20.0)) rows( rayPoint
+                        , y +. 1.0
+                        , width
+                        , height
+                        , reverse(columns(rayPoint, 0.0, y, width, [])) :: acc )
+    else acc
+  }
+  # The samples are computed in reversed order, hence the reverse
+  # below.
+  reverse(rows(rayPoint, 0.0, width, height, []))
+}
+
+# The initial configuration
+sig camera : Camera
+var camera = ( (0.0,1.8,10.0)
+             , 45.0
+             , (0.0, 3.0, 0.0) );
+
+sig objects : List(Sphere.T)
+var objects = [ ((0.0,3.5,-.3.0)  , RGB.mars  , 0.2, 0.7, 0.1, 3.0)
+              , ((-.4.0,2.0,-.1.0), RGB.phobos, 0.1, 0.9, 0.0, 0.5)
+              , ((-.4.0,3.0,-.1.0), RGB.deimos, 0.2, 0.7, 0.1, 0.3) ];
+
+sig lights : Lights
+var lights = [(-.30.0,-.10.0,20.0)];
+
+var width = 640.0 *. 0.33;
+var height = 480.0 *. 0.33;
+
+sig scene : Scene.T
+var scene = (camera, lights, objects, width, height);
+
+# Run the core computation.
+sig runRayTracer : () ~> Matrix2D(RGB.T)
+fun runRayTracer() {
+  # Deconstruct the scene.
+  var (camera, lights, [ p0
+                       , (point1,colour1,spec1,lam1,amb1,rad1)
+                       , (point2,colour2,spec2,lam2,amb2,rad2) ]
+                     , width, height) = scene;
+  # Set the position of each moon
+  var speedMoon1 = 0.1;
+  var speedMoon2 = 0.2;
+  var point1' = (sin(speedMoon1) *. 3.5, point1.2, -.3.0 +. cos(speedMoon1) *. 3.5);
+  var point2' = (sin(speedMoon2) *. 4.0, point2.2, -.3.0 +. cos(speedMoon2) *. 4.0);
+
+  # Reconstruct the scene.
+  var scene = (camera, lights, [ p0
+                                , (point1',colour1,spec1,lam1,amb1,rad1)
+                                , (point2',colour2,spec2,lam2,amb2,rad2) ]
+                             , width, height);
+  # Perform ray tracing.
+  castRays(scene)
+}
+
+#
+# Client-side rendering.
+#
+sig paint : (canvas, Matrix2D(RGB.T)) ~> ()
+fun paint(canvas, data) client {
+  iterif(fun(row, x) {
+    iterif(fun(colour, y) {
+      jsSetFillColor(canvas, RGB.toString(colour));
+      jsFillRect(canvas, x, y, 1.0, 1.0)
+    }, row)
+  }, data)
+}
+
+
+sig render : (DomNode, _, Int, Matrix2D(RGB.T)) ~> ()
+fun render(button, canvas, tracingTime, data) client {
+  var time0 = clientTimeMilliseconds();
+  jsClearRect(canvas, 0.0, 0.0, jsCanvasWidth(canvas), jsCanvasHeight(canvas));
+  paint(canvas, data);
+  var time1 = clientTimeMilliseconds();
+  var renderingTime = time1 - time0;
+  domSetPropertyFromRef(getNodeById("tracingTime"), "innerText", intToString(tracingTime) ^^ " ms");
+  domSetPropertyFromRef(getNodeById("renderingTime"), "innerText", intToString(renderingTime) ^^ " ms");
+  domRemoveAttributeFromRef(button, "disabled")
+}
+
+sig runRayTracerClient : (String, String) ~> ()
+fun runRayTracerClient(buttonId, canvasId) {
+  var button = getNodeById(buttonId);
+  var canvas = jsGetContext2D(getNodeById(canvasId));
+  domSetAttributeFromRef(button, "disabled", "disabled");
+  jsRequestAnimationFrame(fun() {
+    var time0 = clientTimeMilliseconds();
+    var data = runRayTracer();
+    var time1 = clientTimeMilliseconds();
+    render(button, canvas, time1 - time0, data)
+  })
+}
+
+fun mainPage(_) {
+  page
+   <#>
+     <canvas id="canvas" width="{floatToString(width)}" height="{floatToString(height)}" style="float:left;"></canvas>
+     <ul>
+       <li>Tracing time: <span id="tracingTime">N/A</span></li>
+       <li>Rendering time: <span id="renderingTime">N/A</span></li>
+     </ul>
+     <button l:onclick="{runRayTracerClient("button", "canvas")}" id="button">Run ray tracer</button>
+   </#>
+}
+
+fun webMain() {
+  addRoute("/", mainPage);
+  servePages()
+}
+
+webMain()
