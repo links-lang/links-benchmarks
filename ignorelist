@@ -1,1 +1,13 @@
 # The following programs are ignored by the CI.
+./database/nested4.links
+./database/organisation-setup.links
+./database/nested3.links
+./database/organisation-groupby.links
+./database/organisation.links
+./database/organisation-complex.links
+./database/nested1.links
+./database/people.links
+./database/organisation-flat.links
+./database/organisation-nested-normalized.links
+./database/organisation-nested.links
+./database/nested2.links
