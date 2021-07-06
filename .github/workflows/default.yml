@@ -47,10 +47,8 @@ jobs:
 
       - name: Typecheck programs
         run: |
-          eval $(opam env)
           ./typecheck
         env:
-          REPO_DIR: ${{ github.workspace }}
           LINKS_POSTGRES_HOST: localhost
           LINKS_POSTGRES_USER: links
           LINKS_POSTGRES_PASSWORD: links
