@@ -47,6 +47,7 @@ jobs:
 
       - name: Typecheck programs
         run: |
+          eval $(opam env)
           ./typecheck
         env:
           LINKS_POSTGRES_HOST: localhost
