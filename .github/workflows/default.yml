@@ -1,0 +1,60 @@
+name: Typecheck Links benchmark suite
+
+on:
+  pull_request:
+    branches: master
+  push:
+    branches: master
+  schedule:
+    # Prime the caches every Monday
+    - cron: 0 1 * * MON
+
+jobs:
+  typecheck:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+        ocaml-compiler:
+          - 4.08.0
+
+    runs-on: ${{ matrix.os }}
+
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: links
+          POSTGRES_PASSWORD: links
+        ports:
+          - 5433:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Install Links from OPAM
+        run: |
+          eval $(opam env)
+          opam install links links-postgresql
+          linx --version
+        shell: bash
+
+      - name: Typecheck programs
+        run: |
+          eval $(opam env)
+          ./typecheck
+        env:
+          # TODO(dhil): I do not know how to index into the
+          # environments of either service. Until we figure out how to
+          # do it, we will just duplicate information here.
+          LINKS_POSTGRES_HOST: localhost
+          LINKS_POSTGRES_USER: links
+          LINKS_POSTGRES_PASSWORD: links
+          LINKS_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        shell: bash

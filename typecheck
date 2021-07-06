@@ -1,0 +1,18 @@
+#!/bin/bash
+FAILURES=0
+for p in $(find . -name "*.links"); do
+  printf "%s..." $p
+  grep "^$p" "ignorelist" > /dev/null 2>&1
+  if [[ $? -eq 0 ]]; then
+    printf " IGNORED\n"
+  else
+    linx --set=typecheck_only=true $p
+    if [[ $? -eq 0 ]]; then
+      printf " SUCCESS\n"
+    else
+      printf " FAILURE\n"
+      FAILURES=$((FAILURES+1))
+    fi
+  fi
+done
+exit $FAILURES
