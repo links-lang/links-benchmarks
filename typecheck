@@ -1,6 +1,6 @@
 #!/bin/bash
 FAILURES=0
-for p in $(find . -name "*.links"); do
+for p in $(find $REPO_DIR -name "*.links"); do
   printf "%s..." $p
   grep "^$p" "ignorelist" > /dev/null 2>&1
   if [[ $? -eq 0 ]]; then

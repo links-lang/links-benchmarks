@@ -50,9 +50,7 @@ jobs:
           eval $(opam env)
           ./typecheck
         env:
-          # TODO(dhil): I do not know how to index into the
-          # environments of either service. Until we figure out how to
-          # do it, we will just duplicate information here.
+          REPO_DIR: ${{ github.workspace }}
           LINKS_POSTGRES_HOST: localhost
           LINKS_POSTGRES_USER: links
           LINKS_POSTGRES_PASSWORD: links
