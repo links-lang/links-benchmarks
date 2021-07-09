@@ -1,0 +1,220 @@
+# Sieve of Atkin
+#
+# Computes a list of prime numbers less than or equal to some given
+# upper bound.
+#
+# uses: lists, variants, tuples
+
+sig max : (Int,Int) -> Int
+fun max(x,y) {
+  if (x < y) y
+  else x
+}
+
+sig intersperse : (a, [a]) ~> [a]
+fun intersperse(s, xs) {
+  switch (xs) {
+    case [] -> []
+    case [_] -> xs
+    case x :: xs -> x :: s :: intersperse(s, xs)
+  }
+}
+
+# A map implementation based on AVL trees
+# (c.f. https://en.wikipedia.org/wiki/AVL_tree).
+module AVLTree {
+  typename T(k,a) = [|Leaf
+                     |Node:(T(k,a),k,a,T(k,a),Int)|];
+
+  sig height : (T(k,a)) ~> Int
+  fun height(tr) {
+    switch(tr) {
+      case Leaf -> 0
+      case Node(_,_,_,_,h) -> h
+    }
+  }
+
+  sig makeNode : (T(k,a),k,a,T(k,a)) ~> T(k,a)
+  fun makeNode(l,k,x,r) {
+    Node(l,k,x,r,1+max(height(l),height(r)))
+  }
+
+  sig member : (k, T(k,a)) ~> Bool
+  fun member(k, tr) {
+    switch (tr) {
+      case Leaf -> false
+      case Node(l,k',_,r,_) ->
+        if (k < k') member(k, l)
+        else if (k > k') member(k, r)
+        else true
+    }
+  }
+
+  sig lookup : (k, T(k,a)) ~> a
+  fun lookup(k, tr) {
+    switch (tr) {
+      case Leaf -> error("Not found")
+      case Node(l, k',x, r,_) ->
+        if (k < k') lookup(k, l)
+        else if (k > k') lookup(k, r)
+        else x
+    }
+  }
+
+  sig rotateLeft : (T(k,a)) ~> T(k,a)
+  fun rotateLeft(tr) {
+    switch (tr) {
+      case Node(lx, kx, x, Node(ly, ky, y, ry, _), _) ->
+        makeNode(makeNode(lx, kx, x, ly), ky, y, ry)
+      case _ -> error("Impossible [1]")
+    }
+  }
+
+  sig rotateRight : (T(k,a)) ~> T(k,a)
+  fun rotateRight(tr) {
+    switch (tr) {
+      case Node(Node(ly, ky, y, ry, _), kx, x, rx, _) ->
+        makeNode(ly, ky, y, makeNode(ry, kx, x, rx))
+      case _ -> error("Impossible [2]")
+    }
+  }
+
+  sig add : (k, a, T(k,a)) ~> T(k,a)
+  fun add(k, x, tr) {
+    switch (tr) {
+      case Leaf -> makeNode(Leaf, k, x, Leaf)
+      case Node(ly, ky, y, ry, h) ->
+        if (k < ky) {
+          switch (add(k, x, ly)) {
+            case Leaf -> error("Impossible [3]")
+            case Node(ly', ky', y', ry', hy') as tr' ->
+              if (hy' - height(ry) <= 1) makeNode(tr',ky,y,ry)
+              else {
+                var tr' = if (height(ly') < height(ry')) rotateLeft(tr')
+                          else tr';
+                rotateRight(makeNode(tr', ky, y, ry))
+              }
+          }
+        } else if (k > ky) {
+          switch (add(k, x, ry)) {
+            case Leaf -> error("Impossible [4]")
+            case Node(ly', ky', y', ry', hy') as tr' ->
+              if (hy' - height(ly) <= 1) makeNode(ly,ky,y,tr')
+              else {
+                var tr' = if (height(ly') > height(ry')) rotateRight(tr')
+                          else tr';
+                rotateLeft(makeNode(ly, ky, y, tr'))
+              }
+          }
+        } else {
+          Node(ly, ky, x, ry, h)
+        }
+    }
+  }
+
+  sig empty : T(k,a)
+  var empty = Leaf;
+
+  sig fromAssoc : (List((k,a))) ~> T(k,a)
+  fun fromAssoc(xs) {
+    fold_left(fun(tr, (k,v)) { add(k, v, tr) }, empty, xs)
+  }
+
+  sig toAssoc : (T(k,a)) ~> List((k,a))
+  fun toAssoc(tr) {
+    switch (tr) {
+      case Leaf -> []
+      case Node(l, k, x, r, _) ->
+        toAssoc(l) ++ (k, x) :: toAssoc(r)
+    }
+  }
+}
+
+# Computes a list of prime numbers less than or equal to limit.
+sig atkin : (Int) ~> List(Int)
+fun atkin(limit) {
+  # Naturals 2 and 3 are known to be prime.
+  var first =
+    if (limit >= 2) 2 :: (if (limit >= 3) [3] else []) else [];
+
+  # Initialises a storage structure with indices from 5 up to
+  # limit. Each component contains the boolean value false.
+  sig initSieve : (Int) ~> AVLTree.T(Int,Bool)
+  fun initSieve(limit) {
+    AVLTree.fromAssoc(map(fun(k) { (k, false) }, [5..limit]))
+  }
+
+  # Mark ps[n] is true if one of the following is True:
+  # a) n = 4*x^2+y^2 has odd number of solutions, i.e., there exist
+  # odd number of distinct pairs (x, y) that satisfy the equation and
+  # n mod 12 = 1 or n mod 12 = 5.
+  # b) n = 3*x^2+y^2 has odd number of solutions and n mod 12 = 7.
+  # c) n = 3*x^2-y^2 has odd number of solutions, x > y and n mod 12 =
+  # 11.
+  sig xloop : (Int, Int, Int, AVLTree.T(Int,Bool)) ~> AVLTree.T(Int,Bool)
+  fun xloop(x, sqrtLimit, limit, ps) {
+    sig yloop : (Int, Int, Int, Int, AVLTree.T(Int,Bool)) ~> AVLTree.T(Int,Bool)
+    fun yloop(x, y, sqrtLimit, limit, ps) {
+      if (y <= sqrtLimit) {
+        var n = (4 * x * x) + (y * y);
+        var ps =
+          if (n <= limit && (mod(n, 12) == 1 || mod(n, 12) == 5)) {
+            var b = AVLTree.lookup(n, ps);
+            AVLTree.add(n, not(b), ps)
+          } else ps;
+        var n = (3 * x * x) + (y * y);
+        var ps =
+          if (n <= limit && mod(n, 12) == 7) {
+            var b = AVLTree.lookup(n, ps);
+            AVLTree.add(n, not(b), ps)
+          } else ps;
+        var n = (3 * x * x) - (y * y);
+        var ps =
+          if (x > y && n <= limit && mod(n, 12) == 11) {
+            var b = AVLTree.lookup(n, ps);
+            AVLTree.add(n, not(b), ps)
+          } else ps;
+        yloop(x, y+1, sqrtLimit, limit, ps)
+      } else ps
+    }
+
+    if (x <= sqrtLimit) xloop( x+1, sqrtLimit, limit
+                             , yloop(x, 1, sqrtLimit, limit, ps))
+    else ps
+  }
+
+  # Given a collection of candidate primes, this function marks
+  # multiples of squares as non-primes.
+  sig markMultiples : (Int, Int, Int, AVLTree.T(Int, Bool)) ~> AVLTree.T(Int, Bool)
+  fun markMultiples(i, sqrtLimit, limit, ps) {
+    sig innerLoop : (Int, Int, Int, AVLTree.T(Int, Bool)) ~> AVLTree.T(Int, Bool)
+    fun innerLoop(i, j, limit, ps) {
+      if (j * (i * i) <= limit) {
+        innerLoop(i, j + 1, limit, AVLTree.add(j * (i * i), false, ps))
+      } else ps
+    }
+
+    if (i < sqrtLimit) {
+      if (AVLTree.lookup(i, ps)) markMultiples( i + 1, sqrtLimit, limit
+                                              , innerLoop(i, 1, limit, ps))
+      else markMultiples(i + 1, sqrtLimit, limit, ps)
+    } else ps
+  }
+
+  # Precompute sqrt(limit).
+  var sqrtLimit = floatToInt(floor(sqrt(intToFloat(limit))));
+  # Check equations.
+  var ps = xloop(1, sqrtLimit, limit, initSieve(limit));
+  # Mark all mulitples of squares non-primes.
+  var ps = markMultiples(5, sqrtLimit, limit, ps);
+  # Turn the result into a list.
+  first ++ map((.1), filter((.2), AVLTree.toAssoc(ps)))
+}
+
+sig main : () ~> ()
+fun main() {
+  var primes = atkin(100);
+  println(fold_right((^^), "", intersperse(", ", map(intToString, primes))))
+}
+
+main()
