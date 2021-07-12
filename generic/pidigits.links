@@ -1,7 +1,18 @@
 
 typename LFT = (Int, Int, Int, Int);
 
+// Convert LFT into String representation
+fun toStr(m: LFT) {
+  switch (m) {
+    case (a, b, c, d) -> (
+      "(" ^^ intToString(a) ^^ "," ^^ intToString(b) ^^ ","
+       ^^ intToString (c) ^^ "," ^^ intToString(b) ^^ ")"
+    ): String
+  }
+}
 
+
+// Identity element with respect to `comp` function (i.e. matrix multiplication)
 var unit = (1, 0, 0 ,1);
 
 fun comp(m1: LFT, m2: LFT) {
@@ -13,7 +24,6 @@ fun comp(m1: LFT, m2: LFT) {
   }
 }
 
-
 var m1 = (1,2,3,4);
-var res = comp(m1, unit);
-
+var res = toStr(comp(m1, unit));
+print(res ^^ "\n")
