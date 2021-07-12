@@ -20,6 +20,11 @@ fun comp(m1: LFT, m2: LFT) {
    s*u+t*w, s*v+t*x) : LFT
 }
 
+fun floorExtr(m: LFT, x: Int) {
+  var (q, r, s, t) = m;
+  (q * x + r) / (s * x + t) : Int
+}
+
 var n = 10;
 var init = unit;
 
