@@ -1,0 +1,19 @@
+
+typename LFT = (Int, Int, Int, Int);
+
+
+var unit = (1, 0, 0 ,1);
+
+fun comp(m1: LFT, m2: LFT) {
+  switch (m1) {
+    case (q, r, s, t) -> switch (m2) {
+      case (u, v, w, x) ->(q*u+r*w, q*v+r*x,
+                           s*u+t*w, s*v+t*x) : LFT
+    }
+  }
+}
+
+
+var m1 = (1,2,3,4);
+var res = comp(m1, unit);
+
