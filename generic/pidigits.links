@@ -26,14 +26,36 @@ fun floorExtr(m: LFT, x: Int) {
 }
 
 var n = 10;
+
+# init = unit
 var init = unit;
 
 # lfts = [(k, 4*k+2, 0, 2*k+1) | k<-[1..]]
+var lfts = {
+  for (k <- [1..n])
+    [(k, 4*k+2, 0, 2*k+1)] : [LFT]
+};
+
 # next z = floorExtr z 3
+fun next(z: LFT) {
+  floorExtr(z, 3)
+}
+
 # safe z n = n == floorExtr z 4
+fun safe(z: LFT, n: Int) {
+  n == floorExtr(z, 4): Bool
+}
+
 # prod z n = comp (10, -10*n, 0, 1) z
+fun prod(z: LFT, n: Int) {
+  var m = (10, -10*n, 0, 1);
+  comp(m, z): LFT
+}
+
 # cons z z'  = comp z z'
+var cons = comp;
 
 var m1 = (1,2,3,4);
 var res = toStr(comp(m1, unit));
-print(res ^^ "\n")
+# print(res ^^ "\n")
+(fold_left((^^), "", map(toStr,lfts)))
