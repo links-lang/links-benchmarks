@@ -1,25 +1,33 @@
 
+# representation of 2x2 matrix transformation
 typename LFT = (Int, Int, Int, Int);
+
+# Identity matrix with respect to `comp` function (i.e. matrix multiplication)
+var unit = (1, 0, 0 ,1);
 
 # Convert LFT into String representation
 fun toStr(m: LFT) {
-  switch (m) {
-    case (a, b, c, d) -> (
-      "(" ^^ intToString(a) ^^ "," ^^ intToString(b) ^^ ","
-       ^^ intToString (c) ^^ "," ^^ intToString(b) ^^ ")"
-    ): String
-  }
+  var (a, b, c, d) = m;
+  ("(" ^^ intToString(a) ^^ "," ^^ intToString(b) ^^ ","
+    ^^ intToString (c) ^^ "," ^^ intToString(b) ^^ ")"): String
 }
 
-# Identity element with respect to `comp` function (i.e. matrix multiplication)
-var unit = (1, 0, 0 ,1);
-
+# Matrix multiplication on LFT
 fun comp(m1: LFT, m2: LFT) {
   var (q, r, s, t) = m1;
   var (u, v, w, x) = m2;
   (q*u+r*w, q*v+r*x,
    s*u+t*w, s*v+t*x) : LFT
 }
+
+var n = 10;
+var init = unit;
+
+# lfts = [(k, 4*k+2, 0, 2*k+1) | k<-[1..]]
+# next z = floorExtr z 3
+# safe z n = n == floorExtr z 4
+# prod z n = comp (10, -10*n, 0, 1) z
+# cons z z'  = comp z z'
 
 var m1 = (1,2,3,4);
 var res = toStr(comp(m1, unit));
