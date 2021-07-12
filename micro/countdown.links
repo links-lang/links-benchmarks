@@ -1,0 +1,15 @@
+# Countdown
+#
+# Microbenchmark for measuring the effect of tail call optimisation.
+#
+
+sig countdown : (Int, Int) ~> Int
+fun countdown(n, m) {
+  if (n == 0) m
+  else countdown(n-1, m+1)
+}
+
+sig main : () ~> ()
+fun main() {
+  println(intToString(countdown(10000000, 0)))
+}

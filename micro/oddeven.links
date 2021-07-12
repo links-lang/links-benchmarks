@@ -1,0 +1,29 @@
+# Parity test
+#
+# Microbenchmark for measuring the effect of tail call optimisation
+# for mutually recursive functions.
+
+mutual {
+  sig even : (Int) ~> Bool
+  fun even(n) {
+    if (n == 0) true
+    else odd(n - 1)
+  }
+
+  sig odd : (Int) ~> Bool
+  fun odd(n) {
+    if (n == 0) false
+    else even(n - 1)
+  }
+}
+
+sig boolToString : (Bool) -> String
+fun boolToString(b) {
+  if (b) "true"
+  else "false"
+}
+
+sig main : () ~> ()
+fun main() {
+  println(boolToString(even(12345678)))
+}
