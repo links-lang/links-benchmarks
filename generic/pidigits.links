@@ -50,7 +50,27 @@ fun prod(z: LFT, n: Int) {
 sig cons : (LFT, LFT) -> LFT
 var cons = comp;
 
-var m1 = (1,2,3,4);
-var res = toStr(comp(m1, unit));
-# print(res ^^ "\n")
-(fold_left((^^), "", map(toStr,lfts)))
+sig stream : (LFT, [LFT]) ~> [Int]
+fun stream(z: LFT, inputs: [LFT]) {
+  switch (inputs) {
+    case [] -> []
+    case (x::xs) -> {
+      var y = next(z); 
+      if (safe(z, y))
+        y :: stream(prod(z, y), x::xs)
+      else
+        stream(cons(z, x), xs)
+    }
+  }
+}
+
+fun main() {
+  var n = 25;
+  var lfts = {
+    for (k <- [1..n])
+      [(k, 4*k+2, 0, 2*k+1)] : [LFT]
+  };
+  stream(unit, lfts)
+}
+
+main()
