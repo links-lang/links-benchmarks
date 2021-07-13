@@ -28,39 +28,25 @@ fun floorExtr(m: LFT, x: Int) {
   (q * x + r) / (s * x + t) : Int
 }
 
-var n = 10;
-
-# init = unit
 sig init : LFT
 var init = unit;
 
-# lfts = [(k, 4*k+2, 0, 2*k+1) | k<-[1..]]
-sig lfts : [LFT]
-var lfts = {
-  for (k <- [1..n])
-    [(k, 4*k+2, 0, 2*k+1)] : [LFT]
-};
-
-# next z = floorExtr z 3
 sig next : (LFT) -> Int
 fun next(z: LFT) {
   floorExtr(z, 3)
 }
 
-# safe z n = n == floorExtr z 4
 sig safe : (LFT, Int) -> Bool
 fun safe(z: LFT, n: Int) {
   n == floorExtr(z, 4): Bool
 }
 
-# prod z n = comp (10, -10*n, 0, 1) z
 sig prod : (LFT, Int) -> LFT
 fun prod(z: LFT, n: Int) {
   var m = (10, -10*n, 0, 1);
   comp(m, z): LFT
 }
 
-# cons z z'  = comp z z'
 sig cons : (LFT, LFT) -> LFT
 var cons = comp;
 
