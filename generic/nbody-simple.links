@@ -3,7 +3,7 @@
 # =================                                                                        #
 #                                                                                          #
 # Based on Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program" #
-#  <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html> #
+# <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html>  #
 #                                                                                          #
 # Uses: TODO fill this                                                                     #
 #                                                                                          #
@@ -52,17 +52,21 @@ fun vector_sum(lst) {
 # sig (**.) : (Float, Vector3) -> Vector3
 op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
 
+sig norm2 : (Vector3) -> Float
+fun norm2((x,y,z)) {
+  x *. x +. y *. y +. z *. z
+}
+
 sig norm : (Vector3) -> Float
-fun norm((x,y,z)) {
-  var n2 = x *. x +. y *. y +. z *. z;
-  sqrt(n2)
+fun norm(v) {
+  sqrt(norm2(v))
 }
 
 sig interact : (Float, Body, Body) -> (Body, Body)
 fun interact(dt, (pos=r1, vel=v1, mass=m1),
                  (pos=r2, vel=v2, mass=m2)) {
   var dr = r1 --- r2;
-  var d  = norm(dr);
+  var d = norm(dr);
   var mag = dt /. (d *. d *. d);
 
   var fc1 = m2 *. mag;
@@ -89,7 +93,6 @@ fun advance(dt)(system) {
     case [] -> []
 
     case body :: rest -> {
-
       var (body, rest) = fold_left(inter_fold(dt), (body, []), rest);
 
       var pos = body.pos +++ (dt **. body.vel);
@@ -97,6 +100,24 @@ fun advance(dt)(system) {
 
       var rest = advance(dt)(rest);
       body :: rest
+    }
+  }
+}
+
+sig energy : (State) ~> Float
+fun energy(bodies:[Body]) {
+  switch (bodies) {
+    case [] -> 0.0
+    case body::rest -> {
+      var kinetic = 0.5 *. body.mass *. norm2(body.vel);
+      var potential = fold_left(fun(acc, other) {
+        var dr = body.pos --- other.pos;
+	var d = norm(dr);
+	var pot = body.mass *. other.mass /. d;
+	acc -. pot
+      }, 0.0, rest);
+
+      kinetic +. potential +. energy(rest)
     }
   }
 }
