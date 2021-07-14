@@ -1,0 +1,56 @@
+# Alexandru-Dan Corlan's Tepol benchmark (http://dan.corlan.net/bench.html)
+#
+# This program computes a 100-term polynomial 50, 500, 5000, 50000,
+# and 500000 times. The program only tests the quality of code which
+# manipulates local lists and performs simple arithmetics in loops.
+#
+# uses: lists, floats, recursive functions, higher-order functions
+
+# Global constants
+sig mu' : Float
+var mu' = 10.0;
+
+sig tepol : (Float, Int) ~> Float
+fun tepol(x, n) {
+  sig zeroes100 : () ~> List(Float)
+  fun zeroes100() {
+    sig loop : (Int) ~> List(Float)
+    fun loop(j) {
+      if (j < 100) 0.0 :: loop(j+1)
+      else []
+    }
+    loop(0)
+  }
+
+  var zeroes = zeroes100();
+
+  sig loop : (Float, Float, Int) ~> Float
+  fun loop(mu', pu, i) {
+    if (i < n) {
+      var (mu', pol) = fold_right(fun(_, (mu', pol')) {
+                             var mu'' = (mu' +. 2.0) /. 2.0;
+                             (mu'', mu'' :: pol')
+                           }, (mu', []), zeroes);
+      var s = fold_right(fun(j, s) { x *. s +. j }, 0.0, pol);
+      loop(mu', pu +. s, i + 1)
+    } else {
+      pu
+    }
+  }
+
+  loop(mu', 0.0, 0)
+}
+
+sig runBenchmarks : () ~> [(Int, Float)]
+fun runBenchmarks() {
+  var benchmarks = [ (0.2,500)
+                   , (0.2,5000)
+                   , (0.2,50000)
+                   , (0.2,500000) ];
+  map(fun((x, n)) {
+    var time0 = serverTimeMilliseconds();
+    var result = tepol(x, n);
+    var time1 = serverTimeMilliseconds();
+    (time1 - time0, result)
+  }, benchmarks)
+}
