@@ -65,6 +65,8 @@ fun norm(v) {
   sqrt(norm2(v))
 }
 
+# Physics:
+
 sig interact : (Float, Body, Body) -> (Body, Body)
 fun interact(dt, (pos=r1, vel=v1, mass=m1),
                  (pos=r2, vel=v2, mass=m2)) {
@@ -113,6 +115,8 @@ fun energy(bodies:[Body]) {
     case [] -> 0.0
     case body::rest -> {
       var kinetic = 0.5 *. body.mass *. norm2(body.vel);
+      println("KE of body:");
+      println(floatToString(kinetic));
       var potential = fold_left(fun(acc, other) {
         var dr = body.pos --- other.pos;
 	var d = norm(dr);
@@ -126,13 +130,23 @@ fun energy(bodies:[Body]) {
 }
 
 
-sig initial_state : () -> State
+sig offset_momentum : (State) ~> Vector3
+fun offset_momentum(system) {
+  fold_left(fun(acc, body) {
+    acc +++ (body.mass **. body.vel)
+  }, zero3, system)
+}
+
+sig initial_state : () ~> State
 fun initial_state() {
   var pi = 3.141592653589793;
   var solar_mass = 4.0 *. pi *. pi;
   var days_per_year = 365.24;
 
   var sun = (mass = solar_mass, pos = zero3, vel = zero3);
+  var star' = ( mass = solar_mass
+      	      , pos  = (1.0, 0.0, 0.0)
+	      , vel  = (0.0, 0.007 *. days_per_year, 0.0));
 
   var jupiter = ( mass = 9.54791938424326609e-4 *. solar_mass
                 , pos  = ( 4.84143144246472090e0
@@ -166,7 +180,13 @@ fun initial_state() {
                          , 1.62824170038242295e-3 *. days_per_year
                          , -.9.51592254519715870e-5 *. days_per_year ));
 
-  [ sun, jupiter, saturn, uranus, neptune ]
+  # var bodies = [ sun, jupiter, saturn, uranus, neptune ]
+  var bodies = [ sun, star' ];
+  var dp = offset_momentum(bodies);
+  var sun = (sun with vel = (-. 1.0 /. solar_mass) **. dp);
+
+  var bodies = [ sun, star' ];
+  bodies
 }
 
 fun loop(system, dt, i, n) {
