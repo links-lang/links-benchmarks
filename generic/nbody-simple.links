@@ -173,8 +173,9 @@ fun loop(system, dt, i, n) {
   } else { system }
 }
 
-fun main() {
-  var setup = Performance : [| Correctness | Performance |];
+typename Setup = [| Correctness | Performance |];
+sig run_sim : (Setup) ~> ()
+fun run_sim(setup) {
   var n = switch(setup) {
     case Correctness -> 1000
     case Performance -> 50000000
@@ -189,4 +190,8 @@ fun main() {
 
   var e = energy(system);
   println(floatToString(e))
+}
+
+fun main() {
+  run_sim(Correctness)
 }
