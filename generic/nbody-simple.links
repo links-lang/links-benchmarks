@@ -87,8 +87,8 @@ fun inter_fold(dt)((this:Body, acc:[Body]), other:Body) {
   (this', other' :: acc)
 }
 
-sig advance : (Float) -> (State) ~> State
-fun advance(dt)(system) {
+sig advance : (Float, State) ~> State
+fun advance(dt, system) {
   switch (system) {
     case [] -> []
 
@@ -98,7 +98,7 @@ fun advance(dt)(system) {
       var pos = body.pos +++ (dt **. body.vel);
       var body = (pos=pos, vel=body.vel, mass=body.mass);
 
-      var rest = advance(dt)(rest);
+      var rest = advance(dt, rest);
       body :: rest
     }
   }
@@ -164,4 +164,29 @@ fun initial_state() {
                          , -.9.51592254519715870e-5 *. days_per_year ));
 
   [ sun, jupiter, saturn, uranus, neptune ]
+}
+
+fun loop(system, dt, i, n) {
+  if (i < n) {
+    var system = advance(dt, system);
+    loop(system, dt, i+1, n)
+  } else { system }
+}
+
+fun main() {
+  var setup = Performance : [| Correctness | Performance |];
+  var n = switch(setup) {
+    case Correctness -> 1000
+    case Performance -> 50000000
+  };
+  var system = initial_state();
+
+  var e = energy(system);
+  println(floatToString(e));
+
+  var dt = 0.01;
+  var system = loop(system, dt, 0, n);
+
+  var e = energy(system);
+  println(floatToString(e))
 }
