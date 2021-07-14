@@ -33,7 +33,7 @@ fun fst((a,_)) { a }
 sig snd : ((a,b)) -> b
 fun snd((_,b)) { b }
 
-sig map2 : ((a,b) ~> c, [a], [b]) ~> [c]
+sig map2 : ((a,b) ~e~> c, [a], [b]) ~e~> [c]
 fun map2(f, xs, ys) {
   switch ((xs, ys)) {
     case ([], []) -> []
