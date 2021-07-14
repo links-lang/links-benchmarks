@@ -1,13 +1,13 @@
-###########################################################################################
-# N-body simulation
-# =================
-#
-# Based on Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"
-#   <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html>
-#
-# Uses:
-#
-###########################################################################################
+############################################################################################
+# N-body simulation                                                                        #
+# =================                                                                        #
+#                                                                                          #
+# Based on Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program" #
+#  <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html> #
+#                                                                                          #
+# Uses: TODO fill this                                                                     #
+#                                                                                          #
+############################################################################################
 
 # Type aliases:
 typename Triple(a) = (a, a, a);
