@@ -2,8 +2,11 @@
 # N-body simulation                                                                        #
 # =================                                                                        #
 #                                                                                          #
-# Based on Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program" #
-# <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html>  #
+# Based on:										   #
+# * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"        #
+#  <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html> #
+# * and Troestler Christophe's implementation of the same problem in OCaml                 #
+#  <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html>#
 #                                                                                          #
 # Uses: TODO fill this                                                                     #
 #                                                                                          #
