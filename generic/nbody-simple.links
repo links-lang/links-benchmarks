@@ -11,7 +11,6 @@
 
 # Type aliases:
 typename Triple(a) = (a, a, a);
-# typename AList(a, b) = [(a, b)];
 
 typename Vector3 = Triple(Float);
 var zero3 = (0.0, 0.0, 0.0) : Vector3;
@@ -21,17 +20,6 @@ typename Body = ( pos  : Vector3
                 , vel  : Vector3
                 , mass : Scalar );
 
-# typename Name = [| Sun
-#                  | Mercury
-#                  | Venus
-#                  | Earth
-#                  | Mars
-#                  | Jupiter
-#                  | Saturn
-#                  | Uranus
-#                  | Neptune |];
-
-# typename State = AList(Name, Body);
 typename State = [Body];
 
 # Helper functions:
@@ -51,15 +39,6 @@ fun map2(f, xs, ys) {
   }
 }
 
-# sig fst3 : (Triple(a)) -> a
-# fun fst3((x,_,_)) { x }
-
-# sig snd3 : (Triple(a)) -> a
-# fun snd3((_,y,_)) { y }
-
-# sig thd3 : (Triple(a)) -> a
-# fun thd3((_,_,z)) { z }
-
 op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
 
 # sig (---) : (Vector3, Vector3) -> Vector3
@@ -73,37 +52,11 @@ fun vector_sum(lst) {
 # sig (**.) : (Float, Vector3) -> Vector3
 op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
 
-# sig (--) : (Vector3) -> Vector3
-# op -- u { (-.1.0) **. u  }
-
 sig norm : (Vector3) -> Float
 fun norm((x,y,z)) {
   var n2 = x *. x +. y *. y +. z *. z;
   sqrt(n2)
 }
-
-
-# sig assoc : (AList(a, b), a) ~> Maybe(b)
-# fun assoc(alst, k) {
-#   switch (alst) {
-#     case []              -> Nothing
-#     case ((xk,xv)::rest) -> if (xk == k)
-#                             { Just(xv) }
-#                           else
-#                             { assoc(rest, k) }
-#   }
-# }
-
-# sig upd_assoc : (AList(a,b), a, b) ~> AList(a,b)
-# fun upd_assoc(alst, k, v) {
-#   switch (alst) {
-#     case []              -> [(k, v)]
-#     case ((xk,xv)::rest) -> if (xk == k)
-#                            { (k,v) :: rest }
-#                          else
-#                            { (xk,xv) :: upd_assoc(rest, k, v) }
-#   }
-# }
 
 sig interact : (Float, Body, Body) -> (Body, Body)
 fun interact(dt, (pos=r1, vel=v1, mass=m1),
