@@ -117,7 +117,7 @@ fun statemgr(state, f) {
       case Return(x) -> x
       case Put(k, v, resume) -> {
         var state' = upd_assoc(k, v, state);
-        env(state', fun() { statemgr(state', fun() { resume(()) }) })
+        statemgr(state', fun() { env(state', fun() { resume(()) }) })
       }
     }
   })
@@ -300,8 +300,7 @@ fun init_system() {
                         , 1.62824170038242295e-3 *. days_per_year
                         , -.9.51592254519715870e-5 *. days_per_year )));
 
-  # offset_sun_momentum(solar_mass)
-  ()
+  offset_sun_momentum(solar_mass)
 }
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
