@@ -15,7 +15,11 @@ fun toString(bn) {
 
 typename LFT = (BigNum, BigNum, BigNum, BigNum);
 
-var unit = (fromInt(1), fromInt(0), fromInt(0), fromInt(1));
+fun fromTuple (a, b, c, d) {
+  (fromInt(a), fromInt(b), fromInt(c), fromInt(d)) : LFT
+}
+
+var unit = fromTuple(1,0,0,1);
 
 # fun toString(lft) {
 #     var (a, b, c, d) = lft;
@@ -24,9 +28,88 @@ var unit = (fromInt(1), fromInt(0), fromInt(0), fromInt(1));
 #     # concat(numStrs)
 # }
 
+# TODO: use FFI from JS
+op x + y {
+  var BigNum(x) = x;
+  var BigNum(y) = y;
+  BigNum(y)
+}
 
-var n = BigNum.fromInt(123);
+# TODO: use FFI from JS
+op x * y {
+  var BigNum(x) = x;
+  var BigNum(y) = y;
+  BigNum(x)
+}
 
+# TODO: use FFI from JS
+op x / y {
+  var BigNum(x) = x;
+  var BigNum(y) = y;
+  BigNum(x)
+}
+
+fun comp(m1: LFT, m2: LFT) {
+  var (q, r, s, t) = m1;
+  var (u, v, w, x) = m2;
+  var output = (q*u+r*w, q*v+r*x, s*u+t*w, s*v+t*x);
+  output
+}
+
+fun floorExtr(m: LFT, x: BigNum) {
+  var (q, r, s, t) = m;
+  var numerator = (q * x + r);
+  var denominator = (s * x + t);
+  (numerator / denominator) : BigNum
+}
+
+fun next(z: LFT) {
+  floorExtr(z, fromInt(3))
+}
+
+fun prod(z: LFT, n: BigNum) {
+  var m = (fromInt(10), fromInt(-10)*n, fromInt(0), fromInt(1));
+  comp(m, z): LFT
+}
+
+fun safe(z: LFT, n: BigNum) {
+  n == floorExtr(z, fromInt(4)): Bool
+}
+
+
+var cons = comp;
+
+var init = unit;
+
+fun stream(z: LFT, inputs: [LFT]) {
+  switch (inputs) {
+    case []      -> []
+    case (x::xs) -> {
+      var y = next(z); 
+      if (safe(z, y))
+        y :: stream(prod(z, y), x::xs)
+      else
+        stream(cons(z, x), xs)
+    }
+  }
+}
+
+fun stream(z: LFT, inputs: [LFT]) {
+  switch (inputs) {
+    case []      -> []
+    case (x::xs) -> {
+      var y = next(z); 
+      if (safe(z, y))
+        y :: stream(prod(z, y), x::xs)
+      else
+        stream(cons(z, x), xs)
+    }
+  }
+}
+
+
+# var x = fromInt(123);
+# var y = fromInt(456);
 
 fun main() {
   ()
