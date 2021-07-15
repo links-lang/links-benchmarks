@@ -25,7 +25,9 @@ fun comp(m1: LFT, m2: LFT) {
 sig floorExtr : (LFT, Int) -> Int
 fun floorExtr(m: LFT, x: Int) {
   var (q, r, s, t) = m;
-  (q * x + r) / (s * x + t) : Int
+  var num = (q * x + r);
+  var den = (s * x + t);
+  (num / den) : Int
 }
 
 
