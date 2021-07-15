@@ -93,7 +93,6 @@ fun assoc_keys(alst) {
 }
 
 # Handler stuff:
-
 sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
     	  	 	    Keys:() {}-> [a],
                             Dump:() {}-> Alist(a,b)|e}~> v)
@@ -118,11 +117,14 @@ fun statemgr(state, f) {
       case Return(x) -> x
       case Put(k, v, resume) -> {
         var state' = upd_assoc(k, v, state);
-        env(state', fun() { resume(()) })
+        env(state', fun() { statemgr(state', fun() { resume(()) }) })
       }
     }
   })
 }
+
+# TODO env and statemgr are somehow not compatible, only the last Put will be seen next
+
 
 sig ask : (a) {Ask:(a) {}-> b|e}~> b
 fun ask(k) { do Ask(k) }
@@ -298,7 +300,8 @@ fun init_system() {
                         , 1.62824170038242295e-3 *. days_per_year
                         , -.9.51592254519715870e-5 *. days_per_year )));
 
-  offset_sun_momentum(solar_mass)
+  # offset_sun_momentum(solar_mass)
+  ()
 }
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
