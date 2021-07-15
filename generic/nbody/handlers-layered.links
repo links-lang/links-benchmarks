@@ -94,9 +94,9 @@ fun assoc_keys(alst) {
 
 # Handler stuff:
 sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
-    	  	 	    Keys:() {}-> [a],
+                            Keys:() {}-> [a],
                             Dump:() {}-> Alist(a,b)|e}~> v)
-			{Ask{_},Keys{_},Dump{_}|e}~> v
+                        {Ask{_},Keys{_},Dump{_}|e}~> v
 fun env(state, f) {
   handle (f()) {
     case Return(v) -> v
@@ -108,8 +108,8 @@ fun env(state, f) {
 
 sig statemgr : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
                                  Put:(a, b) {}-> (),
-				 Keys:() {}-> [a],
-				 Dump:() {}-> Alist(a,b)|e}~> v)
+                                 Keys:() {}-> [a],
+                                 Dump:() {}-> Alist(a,b)|e}~> v)
                {Ask{_},Put{_},Keys{_},Dump{_}|e}~> v
 fun statemgr(state, f) {
   env(state, fun() {
@@ -123,7 +123,27 @@ fun statemgr(state, f) {
   })
 }
 
-# TODO env and statemgr are somehow not compatible, only the last Put will be seen next
+# TODO env and statemgr are somehow not compatible, only the last Put will be seen next:
+# links> physical_state_mgr(fun() {
+# ......   var d = [dump()];
+# ......   Neptune @. Pos @=< zero3;
+# ......   var d = d ++ [dump()];
+# ......   put(Sun, (mass=0.0, pos=zero3, vel=zero3));
+# ......   d ++ [dump()]
+# ...... });
+
+# [[(Neptune,
+#    (mass = 0.00203368686992,
+#     pos = (15.3796971149, -25.91931461, 0.17925877295),
+#     vel = (0.979090732244, 0.594698998648, -0.0347559555041)))],
+
+#  [(Neptune,
+#    (mass = 0.00203368686992,
+#     pos = (0.0, 0.0, 0.0),
+#     vel = (0.979090732244, 0.594698998648, -0.0347559555041)))],
+
+#  [(Sun, (mass = 0.0, pos = (0.0, 0.0, 0.0), vel = (0.0, 0.0, 0.0)))]] : [Alist (Name,Body)]
+
 
 
 sig ask : (a) {Ask:(a) {}-> b|e}~> b
@@ -164,8 +184,8 @@ op @! e {
     case Just(b) -> {
       switch(p) {
         case Mass -> S'(b.mass)
-	case Pos  -> V'(b.pos)
-	case Vel  -> V'(b.vel)
+        case Pos  -> V'(b.pos)
+        case Vel  -> V'(b.vel)
       }
     }
   }
@@ -247,7 +267,7 @@ op e @=<- v {
 
 # Initialization of the solar system
 sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
-    			            Keys:() {}-> [Name],
+                                    Keys:() {}-> [Name],
                                     Put:(Name, Body) {}-> ()|_}~> ()
 fun offset_sun_momentum(solar_mass) {
   var bodies = keys();
@@ -300,7 +320,8 @@ fun init_system() {
                         , 1.62824170038242295e-3 *. days_per_year
                         , -.9.51592254519715870e-5 *. days_per_year )));
 
-  offset_sun_momentum(solar_mass)
+  # offset_sun_momentum(solar_mass);
+  ()
 }
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
