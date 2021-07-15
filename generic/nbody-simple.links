@@ -129,11 +129,15 @@ fun energy(bodies:[Body]) {
 }
 
 
-sig offset_momentum : (State) ~> Vector3
-fun offset_momentum(system) {
-  fold_left(fun(acc, body) {
+sig offset_momentum : (Float, State) ~> State
+fun offset_momentum(solar_mass, system) {
+  var dp = fold_left(fun(acc, body) {
     acc +++ (body.mass **. body.vel)
-  }, zero3, system)
+  }, zero3, system);
+
+  var (sun::rest) = system;
+  var sun = (sun with vel = (-. 1.0 /. solar_mass) **. dp);
+  (sun::rest)
 }
 
 sig initial_state : () ~> State
@@ -181,10 +185,7 @@ fun initial_state() {
 
   # var bodies = [ sun, jupiter, saturn, uranus, neptune ]
   var bodies = [ sun, star' ];
-  var dp = offset_momentum(bodies);
-  var sun = (sun with vel = (-. 1.0 /. solar_mass) **. dp);
-
-  var bodies = [ sun, star' ];
+  var bodies = offset_momentum(solar_mass, bodies);
   bodies
 }
 
