@@ -2,8 +2,8 @@
 # N-body simulation using Effects and Handlers                                             #
 # ============================================                                             #
 #                                                                                          #
-# Based on:										   #
-# * the simple implementation in <nbody-simple.links>					   #
+# Based on:                                                                                #
+# * the simple implementation in <nbody-simple.links>                                      #
 # * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"        #
 #  <https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html> #
 # * and Troestler Christophe's implementation of the same problem in OCaml                 #
@@ -22,10 +22,10 @@ var zero3 = (0.0, 0.0, 0.0) : Vector3;
 typename Scalar = Float;
 
 typename Name = [| Sun
-	         | Jupiter
-		 | Saturn
-		 | Uranus
-		 | Neptune |];
+                 | Jupiter
+                 | Saturn
+                 | Uranus
+                 | Neptune |];
 
 typename Body = ( pos  : Vector3
                 , vel  : Vector3
@@ -69,9 +69,9 @@ fun assoc(k, alst) {
   switch (alst) {
     case [] -> Nothing
     case ((xk, xv)::rest) -> if (k == xk)
-    	       		       { Just(xv) }
-			     else
-			       { assoc(k, rest) }
+                               { Just(xv) }
+                             else
+                               { assoc(k, rest) }
   }
 }
 
@@ -80,9 +80,9 @@ fun upd_assoc(k, v, alst) {
   switch (alst) {
     case [] -> [(k,v)]
     case ((xk, xv)::rest) -> if (k == xk)
-     	       		       { (k, v) :: rest }
-			     else
-			       { (xk, xv) :: upd_assoc(k, v, rest) }
+                               { (k, v) :: rest }
+                             else
+                               { (xk, xv) :: upd_assoc(k, v, rest) }
   }
 }
 
@@ -97,23 +97,103 @@ fun env(state, f) {
 }
 
 sig statemgr : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
-    	       	      	     	 Put:(a, b) {}-> ()|e}~> v)
-	       {Ask{_},Put{_}|e}~> v
+                                 Put:(a, b) {}-> ()|e}~> v)
+               {Ask{_},Put{_}|e}~> v
 fun statemgr(state, f) {
   env(state, fun() {
     handle(f()) {
       case Return(x) -> x
       case Put(k, v, resume) -> {
         var state' = upd_assoc(k, v, state);
-	env(state', fun() { resume(()) })
+        env(state', fun() { resume(()) })
       }
     }
   })
 }
 
-sig ask : (a) {Ask:(a) {}-> b}-> b
+sig ask : (a) {Ask:(a) {}-> b|e}~> b
 fun ask(k) { do Ask(k) }
 
-sig put : (a, b) {Put:(a, b) {}-> ()}-> ()
+sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
 fun put(k, v) { do Put(k, v) }
 
+# DSL for later
+
+typename Property = [| Mass
+                     | Pos
+                     | Vel |];
+
+typename Projection = [| Proj:(Name, Property) |];
+
+typename Result = [| S':Scalar | V':Vector3 |];
+
+infix 7 @.;
+sig @. : (Name, Property) -> Projection
+op e @. p { Proj(e, p) }
+
+prefix 6 @!;
+sig @! : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Result
+op @! e {
+  var Proj(n, p) = e;
+  var b = ask(n);
+  switch (b) {
+    case Nothing -> error("Undefined symbol")
+    case Just(b) -> {
+      switch(p) {
+        case Mass -> S'(b.mass)
+	case Pos  -> V'(b.pos)
+	case Vel  -> V'(b.vel)
+      }
+    }
+  }
+}
+
+infix 6 @=;
+sig @= : (Projection, Result) {Ask:(Name) {}-> Maybe(Body),
+                               Put:(Name, Body) {}-> ()|e}~> ()
+op e @= v {
+  var Proj(n, p) = e;
+  var b = switch (ask(n)) {
+    case Nothing -> error("Undefined symbol")
+    case Just(b) -> b
+  };
+  var b' = switch ((p, v)) {
+    case (Mass, S'(m)) -> (b with mass = m)
+    case (Pos, V'(v)) -> (b with pos = v)
+    case (Vel, V'(v)) -> (b with vel = v)
+  };
+  put(n, b');
+  ()
+}
+
+# TODO for (maybe) SUGAR: having both ask and put in the same function requires them to
+# share effect variable (or rather to be open => hence open by default)
+
+infix 6 @=<;
+sig @=< : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=< v {
+  e @= V'(v)
+}
+
+infix 6 @=+;
+sig @=+ : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=+ v {
+  var original = switch(@!e) {
+    case V'(v) -> v
+    case _ -> error("Cannot assign a scalar here.")
+  };
+  e @=< (original +++ v)
+}
+
+infix 6 @=-;
+sig @=- : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=- v {
+  var original = switch(@!e) {
+    case V'(v) -> v
+    case _ -> error("Cannot assign a scalar here.")
+  };
+  e @=< (original --- v)
+}
