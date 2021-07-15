@@ -144,6 +144,23 @@ fun statemgr(state, f) {
 
 #  [(Sun, (mass = 0.0, pos = (0.0, 0.0, 0.0), vel = (0.0, 0.0, 0.0)))]] : [Alist (Name,Body)]
 
+sig statemgr' : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
+                                , Put:(a, b) {}-> ()
+				, Keys:() {}-> [a]
+				, Dump:() {}-> Alist(a,b) |e}~> c)
+		{Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
+fun statemgr'(state, f) {
+  shallowhandle (f()) {
+    case Return(v) -> v
+    case Ask(k, resume)    -> { var v = assoc(k, state);
+                                statemgr'(state, fun() { resume(v) }) }
+    case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
+                                statemgr'(state', fun() { resume(()) }) } # ????
+    case Keys(resume)      -> { var keys = assoc_keys(state);
+    	 		        statemgr'(state, fun() { resume(keys) }) }
+    case Dump(resume)      -> { statemgr'(state, fun() { resume(state) })}
+  }
+}
 
 
 sig ask : (a) {Ask:(a) {}-> b|e}~> b
@@ -320,13 +337,13 @@ fun init_system() {
                         , 1.62824170038242295e-3 *. days_per_year
                         , -.9.51592254519715870e-5 *. days_per_year )));
 
-  # offset_sun_momentum(solar_mass);
+  offset_sun_momentum(solar_mass);
   ()
 }
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
 fun physical_state_mgr(f) {
-  statemgr([], fun () {
+  statemgr'([], fun () {
     init_system();
     f()
   })
