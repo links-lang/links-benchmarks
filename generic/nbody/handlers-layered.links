@@ -1,6 +1,6 @@
 ############################################################################################
-# N-body simulation using Effects and Handlers                                             #
-# ============================================                                             #
+# N-body simulation using Effects and Handlers (idealistic but not necessarily fast)       #
+# ==================================================================================       #
 #                                                                                          #
 # Based on:                                                                                #
 # * the simple implementation in <nbody-simple.links>                                      #
@@ -41,6 +41,22 @@ fun fst((a,_)) { a }
 
 sig snd : ((a,b)) -> b
 fun snd((_,b)) { b }
+
+sig take_until : (a, [a]) ~> [a]
+fun take_until(k, lst) {
+  switch(lst) {
+    case [] -> []
+    case (x::xs) -> if (x == k) [] else x :: take_until(k, xs)
+  }
+}
+
+sig drop_until : (a, [a]) ~> [a]
+fun drop_until(k, lst) {
+  switch(lst) {
+    case [] -> []
+    case (x::xs) -> if (x == k) xs else drop_until(k, xs)
+  }
+}
 
 ## Vectors:
 op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
@@ -156,7 +172,7 @@ fun statemgr'(state, f) {
     case Ask(k, resume)    -> { var v = assoc(k, state);
                                 statemgr'(state, fun() { resume(v) }) }
     case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
-                                statemgr'(state', fun() { resume(()) }) } # ????
+                                statemgr'(state', fun() { resume(()) }) }
     case Keys(resume)      -> { var keys = assoc_keys(state);
     	 		        statemgr'(state, fun() { resume(keys) }) }
     case Dump(resume)      -> { statemgr'(state, fun() { resume(state) })}
@@ -281,8 +297,6 @@ op e @=<- v {
 }
 
 
-# Physics
-
 # Initialization of the solar system
 sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
                                     Keys:() {}-> [Name],
@@ -342,10 +356,45 @@ fun init_system() {
   ()
 }
 
+
+# Physics
+
+sig physical_env : (Scalar, () ~%~> v) ~%~> v
+fun physical_env(dt, f) {
+  shallowhandle (f()) {
+    case Return(v) -> v
+    case Interact(dt, n1, resume) -> {
+      var others = take_until(n1, keys());
+
+      var m1 = @!. n1 @. Mass;
+      var r1 = @!> n1 @. Pos;
+      iter(fun(n2) {
+        var dr = r1 --- (@!> n2 @. Pos);
+	var d2 = norm2(dr);
+	var mag = dt /. (d2 *. sqrt(d2));
+
+	var fc1 = (@!. n2 @. Mass) *. mag;
+	var fc2 = m1 *. mag;
+
+	n1 @. Vel @=<- (fc1 **. dr);
+	n2 @. Vel @=<+ (fc2 **. dr)
+      }, others);
+
+      n1 @. Pos @=<+ (dt **. @!> n1 @. Vel);
+      resume(())
+    }
+  }
+}
+
 sig physical_state_mgr : (() ~%~> v) ~%~> v
 fun physical_state_mgr(f) {
   statemgr'([], fun () {
     init_system();
-    f()
+    physical_env(f)
   })
+}
+
+sig simulation : (Int) ~> ()
+fun simulation(n) {
+  
 }
