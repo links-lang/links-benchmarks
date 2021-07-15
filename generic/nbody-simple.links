@@ -103,8 +103,7 @@ fun advance(dt, system) {
       var pos = body.pos +++ (dt **. body.vel);
       var body = (pos=pos, vel=body.vel, mass=body.mass);
 
-      var rest = advance(dt, rest);
-      body :: rest
+      body :: advance(dt, rest)
     }
   }
 }
@@ -115,8 +114,8 @@ fun energy(bodies:[Body]) {
     case [] -> 0.0
     case body::rest -> {
       var kinetic = 0.5 *. body.mass *. norm2(body.vel);
-      println("KE of body:");
-      println(floatToString(kinetic));
+      # println("KE of body:");
+      # println(floatToString(kinetic));
       var potential = fold_left(fun(acc, other) {
         var dr = body.pos --- other.pos;
 	var d = norm(dr);
@@ -145,8 +144,8 @@ fun initial_state() {
 
   var sun = (mass = solar_mass, pos = zero3, vel = zero3);
   var star' = ( mass = solar_mass
-      	      , pos  = (1.0, 0.0, 0.0)
-	      , vel  = (0.0, 0.007 *. days_per_year, 0.0));
+      	      , pos  = (1.0, 1.0, 0.0)
+	      , vel  = (2.0, 0.0, 1.0));
 
   var jupiter = ( mass = 9.54791938424326609e-4 *. solar_mass
                 , pos  = ( 4.84143144246472090e0
@@ -189,6 +188,20 @@ fun initial_state() {
   bodies
 }
 
+sig print_body : (Body) ~> ()
+fun print_body((mass=mass, pos=pos, vel=vel)) {
+  var (x,y,z) = pos;
+  var (vx,vy,vz) = vel;
+  println("Planet:");
+  println(floatToString(x));
+  println(floatToString(y));
+  println(floatToString(z));
+  println(floatToString(vx));
+  println(floatToString(vy));
+  println(floatToString(vz));
+  println("")
+}
+
 fun loop(system, dt, i, n) {
   if (i < n) {
     var system = advance(dt, system);
@@ -207,12 +220,15 @@ fun run_sim(setup) {
 
   var e = energy(system);
   println(floatToString(e));
+  var _ = map(print_body, system);
 
   var dt = 0.01;
   var system = loop(system, dt, 0, n);
 
   var e = energy(system);
-  println(floatToString(e))
+  println(floatToString(e));
+  var _ = map(print_body, system);
+  ()
 }
 
 fun main() {
