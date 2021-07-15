@@ -1,0 +1,36 @@
+
+
+typename BigNum = [|BigNum:String|]; # BigNumStr?
+
+module BigNum {
+
+    fun fromInt(n) {
+        var numStr = intToString(n);
+        BigNum(numStr)
+    }
+
+    fun toString(bn) {
+        var BigNum(n) = bn;
+        n
+    }
+
+}
+
+typename LFT = (BigNum, BigNum, BigNum, BigNum);
+
+var unit = (BigNum.fromInt(1), BigNum.fromInt(0), BigNum.fromInt(0), BigNum.fromInt(1));
+
+fun toString(lft) {
+    var (a, b, c, d) = lft;
+    var numStrs = map(fun(n) {BigNum.toString(n)}, [a,b,c,d]) : [String];
+    # join(",", numStrs); -- no longer works as documented
+    # concat(numStrs)
+}
+
+
+var n = BigNum.fromInt(123);
+
+
+fun main() {
+    # toString(unit)
+}
