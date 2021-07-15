@@ -87,19 +87,31 @@ fun upd_assoc(k, v, alst) {
   }
 }
 
+sig assoc_keys : (Alist(a,b)) ~> [a]
+fun assoc_keys(alst) {
+  map(fst, alst)
+}
+
 # Handler stuff:
 
-sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b)|e}~> v) {Ask{_}|e}~> v
+sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
+    	  	 	    Keys:() {}-> [a],
+                            Dump:() {}-> Alist(a,b)|e}~> v)
+			{Ask{_},Keys{_},Dump{_}|e}~> v
 fun env(state, f) {
   handle (f()) {
     case Return(v) -> v
     case Ask(k, resume) -> resume(assoc(k, state))
+    case Keys(resume) -> resume(assoc_keys(state))
+    case Dump(resume) -> resume(state)
   }
 }
 
 sig statemgr : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
-                                 Put:(a, b) {}-> ()|e}~> v)
-               {Ask{_},Put{_}|e}~> v
+                                 Put:(a, b) {}-> (),
+				 Keys:() {}-> [a],
+				 Dump:() {}-> Alist(a,b)|e}~> v)
+               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> v
 fun statemgr(state, f) {
   env(state, fun() {
     handle(f()) {
@@ -117,6 +129,12 @@ fun ask(k) { do Ask(k) }
 
 sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
 fun put(k, v) { do Put(k, v) }
+
+sig keys : () {Keys:() {}-> [a]|e}~> [a]
+fun keys() { do Keys }
+
+sig dump : () {Dump:() {}-> Alist(a,b)|e}~> Alist(a,b)
+fun dump() { do Dump }
 
 # DSL for later
 
@@ -227,9 +245,10 @@ op e @=<- v {
 
 # Initialization of the solar system
 sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
+    			            Keys:() {}-> [Name],
                                     Put:(Name, Body) {}-> ()|_}~> ()
 fun offset_sun_momentum(solar_mass) {
-  var bodies = [ Sun, Jupiter, Saturn, Uranus, Neptune ];
+  var bodies = keys();
   var dp = fold_left(fun(acc, n) {
     acc +++ (@!. n @. Mass **. @!> n @. Vel)
   }, zero3, bodies);
@@ -238,6 +257,7 @@ fun offset_sun_momentum(solar_mass) {
 }
 
 sig init_system : () {Ask:(Name) {}-> Maybe(Body),
+                      Keys:() {}-> [Name],
                       Put:(Name, Body) {}-> ()|_}~> ()
 fun init_system() {
   var pi = 3.141592653589793;
