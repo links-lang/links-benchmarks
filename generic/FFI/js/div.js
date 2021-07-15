@@ -1,0 +1,1 @@
+var div = LINKS.kify((x, y) => (BigInt(x) / BigInt(y)));
