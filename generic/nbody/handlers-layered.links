@@ -117,7 +117,8 @@ fun statemgr(state, f) {
       case Return(x) -> x
       case Put(k, v, resume) -> {
         var state' = upd_assoc(k, v, state);
-        statemgr(state', fun() { env(state', fun() { resume(()) }) })
+        env(state', fun() { statemgr(state', fun() { resume(()) }) })
+        # statemgr(state', fun() { env(state', fun() { resume(()) }) })
       }
     }
   })
