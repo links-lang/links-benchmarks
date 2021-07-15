@@ -105,11 +105,11 @@ let neptune = { x = 1.53796971148509165e+01;
 let sun = { x = 0.;  y = 0.;  z = 0.;  vx = 0.;  vy = 0.; vz = 0.;
             mass = solar_mass; }
 
-let star' = { sun with x = 1.; y = 1.; vx = 2.; vz = 1.
+let star' = { sun with x = 1.; y = 2.; z = 3.; vx = 0.5; vy = -0.1
               (* ; vy = 0.007 *. days_per_year *) }
 
-(* let bodies = [| sun; jupiter; saturn; uranus; neptune |] *)
-let bodies = [| sun; star' |]
+let bodies = [| sun; jupiter; saturn; uranus; neptune |]
+(* let bodies = [| sun; star' |] *)
 
 let print_body : planet -> unit
   = fun { x; y; z; vx; vy; vz; mass } ->
@@ -126,7 +126,7 @@ let () =
   let n = int_of_string(Sys.argv.(1)) in
   offset_momentum bodies;
   Printf.printf "%.9f\n" (energy bodies);
-  Array.iter print_body bodies;
+  (* Array.iter print_body bodies; *)
   for i = 1 to n do advance bodies 0.01 done;
   Printf.printf "%.9f\n" (energy bodies);
-  Array.iter print_body bodies;
+  (* Array.iter print_body bodies; *)

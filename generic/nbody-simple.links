@@ -71,8 +71,9 @@ sig interact : (Float, Body, Body) -> (Body, Body)
 fun interact(dt, (pos=r1, vel=v1, mass=m1),
                  (pos=r2, vel=v2, mass=m2)) {
   var dr = r1 --- r2;
-  var d = norm(dr);
-  var mag = dt /. (d *. d *. d);
+  var d2 = norm2(dr);
+  # var mag = dt /. (d *. d *. d);
+  var mag = dt /. (d2 *. sqrt(d2));
 
   var fc1 = m2 *. mag;
   var fc2 = m1 *. mag;
@@ -148,8 +149,8 @@ fun initial_state() {
 
   var sun = (mass = solar_mass, pos = zero3, vel = zero3);
   var star' = ( mass = solar_mass
-      	      , pos  = (1.0, 1.0, 0.0)
-	      , vel  = (2.0, 0.0, 1.0));
+      	      , pos  = (1.0, 2.0, 3.0)
+	      , vel  = (0.5, -.0.1, 0.0));
 
   var jupiter = ( mass = 9.54791938424326609e-4 *. solar_mass
                 , pos  = ( 4.84143144246472090e0
@@ -183,8 +184,8 @@ fun initial_state() {
                          , 1.62824170038242295e-3 *. days_per_year
                          , -.9.51592254519715870e-5 *. days_per_year ));
 
-  # var bodies = [ sun, jupiter, saturn, uranus, neptune ]
-  var bodies = [ sun, star' ];
+  var bodies = [ sun, jupiter, saturn, uranus, neptune ];
+  # var bodies = [ sun, star' ];
   var bodies = offset_momentum(solar_mass, bodies);
   bodies
 }
@@ -221,14 +222,14 @@ fun run_sim(setup) {
 
   var e = energy(system);
   println(floatToString(e));
-  var _ = map(print_body, system);
+  # var _ = map(print_body, system);
 
   var dt = 0.01;
   var system = loop(system, dt, 0, n);
 
   var e = energy(system);
   println(floatToString(e));
-  var _ = map(print_body, system);
+  # var _ = map(print_body, system);
   ()
 }
 
