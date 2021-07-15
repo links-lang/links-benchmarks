@@ -88,57 +88,32 @@ fun upd_assoc(k, v, alst) {
 
 # Handler stuff:
 
-# SUGAR: here to omit the presence on the last arrow
-# sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),Put:(a, b) {}-> ()|c}~> r) {Ask{_},Put{_}|c}~> r
+sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b)|e}~> v) {Ask{_}|e}~> v
 fun env(state, f) {
-  println("Env with:");
-  do Dump(state);
-  println("----------");
   handle (f()) {
     case Return(v) -> v
     case Ask(k, resume) -> resume(assoc(k, state))
-    case Put(k, v, resume) -> {
-      var state' = upd_assoc(k, v, state);
-      env(state', fun () { resume(()) })
-    }
   }
 }
 
-# sig ask : (a) {Ask:(a) {}-> b}-> b
+sig statemgr : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
+    	       	      	     	 Put:(a, b) {}-> ()|e}~> v)
+	       {Ask{_},Put{_}|e}~> v
+fun statemgr(state, f) {
+  env(state, fun() {
+    handle(f()) {
+      case Return(x) -> x
+      case Put(k, v, resume) -> {
+        var state' = upd_assoc(k, v, state);
+	env(state', fun() { resume(()) })
+      }
+    }
+  })
+}
+
+sig ask : (a) {Ask:(a) {}-> b}-> b
 fun ask(k) { do Ask(k) }
 
-# sig put : (a, b) {Put:(a, b) {}-> ()}-> ()
+sig put : (a, b) {Put:(a, b) {}-> ()}-> ()
 fun put(k, v) { do Put(k, v) }
 
-# sig test : () {Ask:%ea, Put:%ep|%e}-> Triple(Maybe(Name))
-fun test() {
-  var a1 = ask(1);
-  put(1, 2);
-  var a2 = ask(1);
-  put(1, 3);
-  var a3 = ask(1);
-  (a1, a2, a3)
-}
-
-fun pp_int_alist(alst) {
-  switch (alst) {
-    case [] -> ()
-    case (k,v)::rest -> {
-      println(intToString(k));
-      println(" => ");
-      println(intToString(v))
-    }
-  }
-}
-
-fun dump(f) {
-  handle(f()) {
-    case Return(v) -> v
-    case Dump(alst, resume) -> {
-      pp_int_alist(alst);
-      resume(())
-    }
-  }
-}
-
-var a = dump(fun () { env([], test) });
