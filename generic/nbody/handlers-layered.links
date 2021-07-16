@@ -1,6 +1,6 @@
 ############################################################################################
-# N-body simulation using Effects and Handlers (idealistic but not necessarily fast)       #
-# ==================================================================================       #
+# N-body simulation using Effects and Handlers: simulating mutation                        #
+# =================================================================                        #
 #                                                                                          #
 # Based on:                                                                                #
 # * the simple implementation in <nbody-simple.links>                                      #
@@ -109,6 +109,7 @@ fun assoc_keys(alst) {
 }
 
 # Handler stuff:
+# TODO remove the env, statemgr, using a shallow handler in statemgr' instead
 sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
                             Keys:() {}-> [a],
                             Dump:() {}-> Alist(a,b)|e}~> v)
@@ -245,6 +246,10 @@ op @!> e {
   }
 }
 
+infix 6 @=|;
+sig @=| : (a, b) {Put:(a,b) {}-> ()|e}~> ()
+op n @=| v { put(n, v) }
+
 infix 6 @=;
 sig @= : (Projection, Result) {Ask:(Name) {}-> Maybe(Body),
                                Put:(Name, Body) {}-> ()|e}~> ()
@@ -318,39 +323,39 @@ fun init_system() {
   var solar_mass = 4.0 *. pi *. pi;
   var days_per_year = 365.24;
 
-  put(Sun, (mass = solar_mass, pos = zero3, vel = zero3));
+  Sun @=| (mass = solar_mass, pos = zero3, vel = zero3));
 
-  put(Jupiter, ( mass = 9.54791938424326609e-4 *. solar_mass
-               , pos  = ( 4.84143144246472090e0
-                        , -.1.16032004402742839e0
-                        , -.1.03622044471123109e-1 )
-               , vel  = ( 1.66007664274403694e-3 *. days_per_year
-                        , 7.69901118419740425e-3 *. days_per_year
-                        , -.6.90460016972063023e-5 *. days_per_year )));
+  Jupiter @=| ( mass = 9.54791938424326609e-4 *. solar_mass
+              , pos  = ( 4.84143144246472090e0
+                       , -.1.16032004402742839e0
+                       , -.1.03622044471123109e-1 )
+              , vel  = ( 1.66007664274403694e-3 *. days_per_year
+                       , 7.69901118419740425e-3 *. days_per_year
+                       , -.6.90460016972063023e-5 *. days_per_year )));
 
-  put(Saturn, ( mass = 2.85885980666130812e-4 *. solar_mass
-              , pos  = ( 8.34336671824457987e0
-                       , 4.12479856412430479e0
-                       , -.4.03523417114321381e-1 )
-              , vel  = ( -.2.76742510726862411e-3 *. days_per_year
-                       , 4.99852801234917238e-3 *. days_per_year
-                       , 2.30417297573763929e-5 *. days_per_year )));
+  Saturn @=| ( mass = 2.85885980666130812e-4 *. solar_mass
+             , pos  = ( 8.34336671824457987e0
+                      , 4.12479856412430479e0
+                      , -.4.03523417114321381e-1 )
+             , vel  = ( -.2.76742510726862411e-3 *. days_per_year
+                      , 4.99852801234917238e-3 *. days_per_year
+                      , 2.30417297573763929e-5 *. days_per_year )));
 
-  put(Uranus, ( mass = 4.36624404335156298e-5 *. solar_mass
-              , pos  = ( 1.28943695621391310e1
-                       , -.1.51111514016986312e1
-                       , -.2.23307578892655734e-1 )
-              , vel  = ( 2.96460137564761618e-3 *. days_per_year
-                       , 2.37847173959480950e-3 *. days_per_year
-                       , -.2.96589568540237556e-5 *. days_per_year )));
+  Uranus @=| ( mass = 4.36624404335156298e-5 *. solar_mass
+             , pos  = ( 1.28943695621391310e1
+                      , -.1.51111514016986312e1
+                      , -.2.23307578892655734e-1 )
+             , vel  = ( 2.96460137564761618e-3 *. days_per_year
+                      , 2.37847173959480950e-3 *. days_per_year
+                      , -.2.96589568540237556e-5 *. days_per_year )));
 
-  put(Neptune, ( mass = 5.15138902046611451e-5 *. solar_mass
-               , pos  = ( 1.53796971148509165e1
-                        , -.2.59193146099879641e1
-                        , 1.79258772950371181e-1 )
-               , vel  = ( 2.68067772490389322e-3 *. days_per_year
-                        , 1.62824170038242295e-3 *. days_per_year
-                        , -.9.51592254519715870e-5 *. days_per_year )));
+  Neptune @=| ( mass = 5.15138902046611451e-5 *. solar_mass
+              , pos  = ( 1.53796971148509165e1
+                       , -.2.59193146099879641e1
+                       , 1.79258772950371181e-1 )
+              , vel  = ( 2.68067772490389322e-3 *. days_per_year
+                       , 1.62824170038242295e-3 *. days_per_year
+                       , -.9.51592254519715870e-5 *. days_per_year )));
 
   offset_sun_momentum(solar_mass);
   ()
@@ -359,38 +364,26 @@ fun init_system() {
 
 # Physics
 
-sig physical_env : (Scalar, () ~%~> v) ~%~> v
-fun physical_env(dt, f) {
-  shallowhandle (f()) {
-    case Return(v) -> v
-    case Interact(dt, n1, resume) -> {
-      var others = take_until(n1, keys());
+sig pair_interact : (Scalar, Name, Name) ~%~> ()
+fun pair_interact(dt, n1, n2) {
+  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
+  var d2 = norm2(dr);
+  var mag = dt /. (d2 *. sqrt(d2));
 
-      var m1 = @!. n1 @. Mass;
-      var r1 = @!> n1 @. Pos;
-      iter(fun(n2) {
-        var dr = r1 --- (@!> n2 @. Pos);
-	var d2 = norm2(dr);
-	var mag = dt /. (d2 *. sqrt(d2));
+  var fc1 = (@!. n2 @. Mass) *. mag;
+  var fc2 = (@!. n1 @. Mass) *. mag;
 
-	var fc1 = (@!. n2 @. Mass) *. mag;
-	var fc2 = m1 *. mag;
+  n1 @. Vel @=<- (fc1 **. dr);
+  n2 @. Vel @=<+ (fc2 **. dr);
 
-	n1 @. Vel @=<- (fc1 **. dr);
-	n2 @. Vel @=<+ (fc2 **. dr)
-      }, others);
-
-      n1 @. Pos @=<+ (dt **. @!> n1 @. Vel);
-      resume(())
-    }
-  }
+  n1 @. Pos @=<+ (dt **. (@!> n1 @. Vel))
 }
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
 fun physical_state_mgr(f) {
   statemgr'([], fun () {
     init_system();
-    physical_env(f)
+    f()
   })
 }
 
