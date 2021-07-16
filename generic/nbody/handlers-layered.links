@@ -401,3 +401,24 @@ fun advance(dt, ns) {
     }
   }
 }
+
+sig energy : ([Name]) ~%~> Scalar
+fun energy(ns) {
+  switch(ns) {
+    case [] -> 0.0
+    case n::rest -> {
+      # TODO these searches will take long - there could be some
+      # internal optimization (but this is all purposefully
+      # transparent to the physics code)
+      var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
+      var potential = fold_left(fun (acc, other) {
+        var dr = (@!> n@.Pos) --- (@!> other@.Pos);
+        var d = norm(dr);
+        var pot = (@!$ n@.Mass) *. (@!$ other@.Mass) /. d;
+        acc -. pot
+      }, 0.0, rest);
+
+      kinetic +. potential +. energy(rest)
+    }
+  }
+}

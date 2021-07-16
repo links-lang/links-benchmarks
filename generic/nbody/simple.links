@@ -111,6 +111,7 @@ fun advance(dt, system) {
 
 sig energy : (State) ~> Float
 fun energy(bodies:[Body]) {
+  # TODO this can be rewritten as a fold
   switch (bodies) {
     case [] -> 0.0
     case body::rest -> {
