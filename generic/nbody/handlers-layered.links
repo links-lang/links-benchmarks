@@ -227,9 +227,9 @@ op @! e {
 }
 
 
-prefix 6 @!.;
-sig @!. : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Scalar
-op @!. e {
+prefix 6 @!$;
+sig @!$ : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Scalar
+op @!$ e {
   switch(@!e) {
     case S'(v) -> v
     case _ -> error("Invalid scalar projection.")
@@ -264,8 +264,7 @@ op e @= v {
     case (Pos, V'(v)) -> (b with pos = v)
     case (Vel, V'(v)) -> (b with vel = v)
   };
-  put(n, b');
-  ()
+  put(n, b')
 }
 
 # TODO for (maybe) SUGAR: having both ask and put in the same function requires them to
@@ -309,7 +308,7 @@ sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
 fun offset_sun_momentum(solar_mass) {
   var bodies = keys();
   var dp = fold_left(fun(acc, n) {
-    acc +++ (@!. n @. Mass **. @!> n @. Vel)
+    acc +++ (@!$ n @. Mass **. @!> n @. Vel)
   }, zero3, bodies);
   var v = (-. 1.0 /. solar_mass) **. dp;
   Sun @. Vel @=< v
@@ -370,21 +369,6 @@ fun init_system() {
 
 # Physics
 
-sig pair_interact : (Scalar, Name, Name) ~%~> ()
-fun pair_interact(dt, n1, n2) {
-  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
-  var d2 = norm2(dr);
-  var mag = dt /. (d2 *. sqrt(d2));
-
-  var fc1 = (@!. n2 @. Mass) *. mag;
-  var fc2 = (@!. n1 @. Mass) *. mag;
-
-  n1 @. Vel @=<- (fc1 **. dr);
-  n2 @. Vel @=<+ (fc2 **. dr);
-
-  n1 @. Pos @=<+ (dt **. (@!> n1 @. Vel))
-}
-
 sig physical_state_mgr : (() ~%~> v) ~%~> v
 fun physical_state_mgr(f) {
   statemgr'([], fun () {
@@ -393,7 +377,27 @@ fun physical_state_mgr(f) {
   })
 }
 
-sig simulation : (Int) ~> ()
-fun simulation(n) {
-  
+sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
+fun pair_interact(dt)(n1)(n2) {
+  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
+  var d2 = norm2(dr);
+  var mag = dt /. (d2 *. sqrt(d2));
+
+  var fc1 = (@!$ n2 @. Mass) *. mag;
+  var fc2 = (@!$ n1 @. Mass) *. mag;
+
+  n1 @. Vel @=<- (fc1 **. dr);
+  n2 @. Vel @=<+ (fc2 **. dr)
+}
+
+sig advance : (Scalar, [Name]) ~%~> ()
+fun advance(dt, ns) {
+  switch (ns) {
+    case [] -> ()
+    case (n::rest) -> {
+      iter(pair_interact(dt)(n), rest);
+      n @. Pos @=<+ (dt **. (@!> n @. Vel));
+      advance(dt, rest)
+    }
+  }
 }
