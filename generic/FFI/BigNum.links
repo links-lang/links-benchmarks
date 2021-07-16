@@ -40,7 +40,10 @@ fun lftToString(lft) {
     "(" ^^ join(", ", numStrs) ^^ ")"
 }
 
-# TODO: precedence
+# TODO: Check syntax
+infixl 3 <*>;
+infixl 3 </>;
+infixl 2 <+>;
 
 op x <+> y {
   var BigNumStr(x) = x;
