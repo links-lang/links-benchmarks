@@ -30,12 +30,15 @@ fun fromTuple (a, b, c, d) {
 
 var unit = fromTuple(1,0,0,1);
 
-# fun toString(lft) {
-#     var (a, b, c, d) = lft;
-#     var numStrs = map(fun(n) {BigNum.toString(n)}, [a,b,c,d]) : [String];
-#     # join(",", numStrs); -- no longer works as documented
-#     # concat(numStrs)
-# }
+
+fun concat(xs) { fold_left1((^^), xs) }
+fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
+
+fun lftToString(lft) {
+    var (a, b, c, d) = lft;
+    var numStrs = map(toString, [a,b,c,d]) : [String];
+    "(" ^^ join(", ", numStrs) ^^ ")"
+}
 
 # TODO: precedence
 
@@ -123,13 +126,21 @@ var n = 5;
 fun mainPage(_) {
   var _ = spawnClient {
     var lfts = {
-      for (k <- [1..5])
-        [(bigNum(k), bigNum(4)<*>bigNum(k)<+>bigNum(2), bigNum(0), bigNum(2)<*>bigNum(k)<+>bigNum(1))] : [LFT]
+      for (k <- [1..5]) {
+        var a = bigNum(k);
+        var b = bigNum(4)<*>bigNum(k)<+>bigNum(2);
+        var c = bigNum(0);
+        var d = bigNum(2)<*>bigNum(k)<+>bigNum(1);
+        [(a,b,c,d)]
+      } 
     };
 
+    var lftStr = map(lftToString, lfts);
+    println(join("\n", lftStr));
+
     var resultBigNums= stream(unit, lfts);
-    # var resultOutput = fold_left1((^^),map(toString, resultBigNums));
-    # println(resultOutput);
+    var resultOutput = concat(map(toString, resultBigNums));
+    println(resultOutput);
 
 
     var x = "827051679123300405951680961800347285106958375787734756185263755457764627838532131089947524982865945742274339057699143896563382796586769455623565354897448889999809072755913848194352516842966752270841483271723609604541923087199354715662710621545142765404881732416241159842802394931437429360793488706913600170045593406575262355741012590138599576920599438827724247100958597505123443761519190613610730175470175873951817371622201178908511201808664614824604233712117325108825239818447574140960397474041509154652237911392309279005968322600906579216940730225937870723028764539744366795168184831792994264341855880293429565439102844043988399826330572413933586636842136012966156884593999405673341793855876656124536982904138877289894304284613619788341098981732102402020245790481567382812500"; 
