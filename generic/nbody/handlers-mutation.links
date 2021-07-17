@@ -109,74 +109,26 @@ fun assoc_keys(alst) {
 }
 
 # Handler stuff:
-# TODO remove the env, statemgr, using a shallow handler in statemgr' instead
-sig env : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
-                            Keys:() {}-> [a],
-                            Dump:() {}-> Alist(a,b)|e}~> v)
-                        {Ask{_},Keys{_},Dump{_}|e}~> v
-fun env(state, f) {
-  handle (f()) {
-    case Return(v) -> v
-    case Ask(k, resume) -> resume(assoc(k, state))
-    case Keys(resume) -> resume(assoc_keys(state))
-    case Dump(resume) -> resume(state)
-  }
-}
 
-sig statemgr : (Alist (a,b), () {Ask:(a) {}-> Maybe (b),
-                                 Put:(a, b) {}-> (),
-                                 Keys:() {}-> [a],
-                                 Dump:() {}-> Alist(a,b)|e}~> v)
-               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> v
+sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
+                               , Put:(a, b) {}-> ()
+                               , Keys:() {}-> [a]
+                               , Dump:() {}-> Alist(a,b) |e}~> c)
+               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
 fun statemgr(state, f) {
-  env(state, fun() {
-    handle(f()) {
-      case Return(x) -> x
-      case Put(k, v, resume) -> {
-        var state' = upd_assoc(k, v, state);
-        env(state', fun() { statemgr(state', fun() { resume(()) }) })
-        # statemgr(state', fun() { env(state', fun() { resume(()) }) })
-      }
-    }
-  })
-}
-
-# TODO env and statemgr are somehow not compatible, only the last Put will be seen next:
-# links> physical_state_mgr(fun() {
-# ......   var d = [dump()];
-# ......   Neptune @. Pos @=< zero3;
-# ......   var d = d ++ [dump()];
-# ......   put(Sun, (mass=0.0, pos=zero3, vel=zero3));
-# ......   d ++ [dump()]
-# ...... });
-
-# [[(Neptune,
-#    (mass = 0.00203368686992,
-#     pos = (15.3796971149, -25.91931461, 0.17925877295),
-#     vel = (0.979090732244, 0.594698998648, -0.0347559555041)))],
-
-#  [(Neptune,
-#    (mass = 0.00203368686992,
-#     pos = (0.0, 0.0, 0.0),
-#     vel = (0.979090732244, 0.594698998648, -0.0347559555041)))],
-
-#  [(Sun, (mass = 0.0, pos = (0.0, 0.0, 0.0), vel = (0.0, 0.0, 0.0)))]] : [Alist (Name,Body)]
-
-sig statemgr' : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
-                                , Put:(a, b) {}-> ()
-                                , Keys:() {}-> [a]
-                                , Dump:() {}-> Alist(a,b) |e}~> c)
-                {Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
-fun statemgr'(state, f) {
   shallowhandle (f()) {
     case Return(v) -> v
+
     case Ask(k, resume)    -> { var v = assoc(k, state);
-                                statemgr'(state, fun() { resume(v) }) }
+                                statemgr(state, fun() { resume(v) }) }
+
     case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
-                                statemgr'(state', fun() { resume(()) }) }
+                                statemgr(state', fun() { resume(()) }) }
+
     case Keys(resume)      -> { var keys = assoc_keys(state);
-                                statemgr'(state, fun() { resume(keys) }) }
-    case Dump(resume)      -> { statemgr'(state, fun() { resume(state) })}
+                                statemgr(state, fun() { resume(keys) }) }
+
+    case Dump(resume)      -> { statemgr(state, fun() { resume(state) })}
   }
 }
 
@@ -267,9 +219,6 @@ op e @= v {
   put(n, b')
 }
 
-# TODO for (maybe) SUGAR: having both ask and put in the same function requires them to
-# share effect variable (or rather to be open => hence open by default)
-
 infix 6 @=<;
 sig @=< : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
                                  Put:(Name, Body) {}-> ()|e}~> ()
@@ -302,6 +251,7 @@ op e @=<- v {
 
 
 # Initialization of the solar system
+
 sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
                                     Keys:() {}-> [Name],
                                     Put:(Name, Body) {}-> ()|_}~> ()
@@ -362,8 +312,7 @@ fun init_system() {
                        ,   1.62824170038242295e-3
                        , -.9.51592254519715870e-5 ));
 
-  offset_sun_momentum(solar_mass);
-  ()
+  offset_sun_momentum(solar_mass)
 }
 
 
