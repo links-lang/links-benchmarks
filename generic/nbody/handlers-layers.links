@@ -10,21 +10,9 @@
 typename Triple(a) = (a, a, a);
 typename Alist(a, b) = [(a, b)];
 
-typename Vector3 = Triple(Float);
-var zero3 = (0.0, 0.0, 0.0) : Vector3;
-typename Scalar = Float;
-
-typename Name = [| Sun
-                 | Jupiter
-                 | Saturn
-                 | Uranus
-                 | Neptune |];
-
 typename Body = ( pos  : Vector3
                 , vel  : Vector3
                 , mass : Scalar );
-
-typename State = Alist(Name, Body);
 
 
 # Helper functions:
@@ -51,29 +39,9 @@ fun drop_until(k, lst) {
   }
 }
 
-## Vectors:
-op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
-op (ux,uy,uz) --- (vx,vy,vz) { (ux -. vx, uy -. vy, uz -. vz ) }
 
-sig vector_sum : ([Vector3]) ~> Vector3
-fun vector_sum(lst) {
-  fold_left((+++), zero3, lst)
-}
+############ STATE ############
 
-infix 5 **.;
-op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
-
-sig norm2 : (Vector3) -> Float
-fun norm2((x,y,z)) {
-  x *. x +. y *. y +. z *. z
-}
-
-sig norm : (Vector3) -> Float
-fun norm(v) {
-  sqrt(norm2(v))
-}
-
-## Alist:
 sig assoc : (a, Alist(a,b)) ~> Maybe(b)
 fun assoc(k, alst) {
   switch (alst) {
@@ -222,7 +190,7 @@ op e @=< v {
 
 infix 6 @=<+;
 sig @=<+ : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
-                                 Put:(Name, Body) {}-> ()|e}~> ()
+                                  Put:(Name, Body) {}-> ()|e}~> ()
 op e @=<+ v {
   var original = switch(@!e) {
     case V'(v) -> v
@@ -233,13 +201,92 @@ op e @=<+ v {
 
 infix 6 @=<-;
 sig @=<- : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
-                                 Put:(Name, Body) {}-> ()|e}~> ()
+                                  Put:(Name, Body) {}-> ()|e}~> ()
 op e @=<- v {
   var original = switch(@!e) {
     case V'(v) -> v
     case _ -> error("Cannot assign a scalar here.")
   };
   e @=< (original --- v)
+}
+
+
+############ PHYSICS ############
+
+# Vector helpers:
+
+typename Vector3 = Triple(Float);
+var zero3 = (0.0, 0.0, 0.0) : Vector3;
+typename Scalar = Float;
+
+op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
+op (ux,uy,uz) --- (vx,vy,vz) { (ux -. vx, uy -. vy, uz -. vz ) }
+
+sig vector_sum : ([Vector3]) ~> Vector3
+fun vector_sum(lst) {
+  fold_left((+++), zero3, lst)
+}
+
+infix 5 **.;
+op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
+
+sig norm2 : (Vector3) -> Float
+fun norm2((x,y,z)) {
+  x *. x +. y *. y +. z *. z
+}
+
+sig norm : (Vector3) -> Float
+fun norm(v) {
+  sqrt(norm2(v))
+}
+
+# Bodies:
+
+typename Body = ( mass : Float
+                , pos  : Vector3
+		, vel  : Vector3 )
+
+sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
+fun pair_interact(dt)(n1)(n2) {
+  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
+  var d2 = norm2(dr);
+  var mag = dt /. (d2 *. sqrt(d2));
+
+  var fc1 = (@!$ n2 @. Mass) *. mag;
+  var fc2 = (@!$ n1 @. Mass) *. mag;
+
+  n1 @. Vel @=<- (fc1 **. dr);
+  n2 @. Vel @=<+ (fc2 **. dr)
+}
+
+sig advance : (Scalar, [Name]) ~%~> ()
+fun advance(dt, ns) {
+  switch (ns) {
+    case [] -> ()
+    case (n::rest) -> {
+      iter(pair_interact(dt)(n), rest);
+      n @. Pos @=<+ (dt **. (@!> n @. Vel));
+      advance(dt, rest)
+    }
+  }
+}
+
+sig energy : ([Name]) ~%~> Scalar
+fun energy(ns) {
+  switch(ns) {
+    case [] -> 0.0
+    case n::rest -> {
+      var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
+      var potential = fold_left(fun (acc, other) {
+        var dr = (@!> n@.Pos) --- (@!> other@.Pos);
+        var d = norm(dr);
+        var pot = (@!$ n@.Mass) *. (@!$ other@.Mass) /. d;
+        acc -. pot
+      }, 0.0, rest);
+
+      kinetic +. potential +. energy(rest)
+    }
+  }
 }
 
 
@@ -309,63 +356,7 @@ fun init_system() {
 }
 
 
-# Physics
-
-sig physical_state_mgr : (() ~%~> v) ~%~> v
-fun physical_state_mgr(f) { statemgr([], f) }
-
-sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
-fun pair_interact(dt)(n1)(n2) {
-  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
-  var d2 = norm2(dr);
-  var mag = dt /. (d2 *. sqrt(d2));
-
-  var fc1 = (@!$ n2 @. Mass) *. mag;
-  var fc2 = (@!$ n1 @. Mass) *. mag;
-
-  n1 @. Vel @=<- (fc1 **. dr);
-  n2 @. Vel @=<+ (fc2 **. dr)
-}
-
-sig advance : (Scalar, [Name]) ~%~> ()
-fun advance(dt, ns) {
-  switch (ns) {
-    case [] -> ()
-    case (n::rest) -> {
-      iter(pair_interact(dt)(n), rest);
-      n @. Pos @=<+ (dt **. (@!> n @. Vel));
-      advance(dt, rest)
-    }
-  }
-}
-
-sig energy : ([Name]) ~%~> Scalar
-fun energy(ns) {
-  switch(ns) {
-    case [] -> 0.0
-    case n::rest -> {
-      # TODO these searches will take long - there could be some
-      # internal optimization (but this is all purposefully
-      # transparent to the physics code)
-      var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
-      var potential = fold_left(fun (acc, other) {
-        var dr = (@!> n@.Pos) --- (@!> other@.Pos);
-        var d = norm(dr);
-        var pot = (@!$ n@.Mass) *. (@!$ other@.Mass) /. d;
-        acc -. pot
-      }, 0.0, rest);
-
-      kinetic +. potential +. energy(rest)
-    }
-  }
-}
-
-fun loop(n, dt, names) {
-  if (n > 0) {
-    advance(dt, names);
-    loop(n - 1, dt, names)
-  } else { () }
-}
+############ PROGRAM ENTRY ############
 
 fun simulation(n, dt) {
   init_system();
@@ -374,7 +365,7 @@ fun simulation(n, dt) {
   var e = energy(system);
   println(floatToString(e));
 
-  loop(n, dt, system);
+  # TODO stuff happening here (literally)
 
   var e = energy(system);
   println(floatToString(e))
@@ -389,9 +380,11 @@ fun run_sim(setup) {
     case Performance -> 50000000
   };
   var dt = 0.01;
-  physical_state_mgr(fun() { simulation(n, dt) })
+  # TODO run simulation
 }
 
 fun main() {
   run_sim(Correctness)
 }
+
+
