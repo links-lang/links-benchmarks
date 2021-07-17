@@ -370,12 +370,7 @@ fun init_system() {
 # Physics
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
-fun physical_state_mgr(f) {
-  statemgr'([], fun () {
-    init_system();
-    f()
-  })
-}
+fun physical_state_mgr(f) { statemgr'([], f) }
 
 sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
 fun pair_interact(dt)(n1)(n2) {
@@ -421,4 +416,40 @@ fun energy(ns) {
       kinetic +. potential +. energy(rest)
     }
   }
+}
+
+fun loop(n, dt, names) {
+  if (n > 0) {
+    advance(dt, names);
+    loop(n - 1, dt, names)
+  } else { () }
+}
+
+fun simulation(n, dt) {
+  init_system();
+  var system = keys();
+
+  var e = energy(system);
+  println(floatToString(e));
+
+  loop(n, dt, system);
+
+  var e = energy(system);
+  println(floatToString(e))
+}
+
+typename Setup = [| Correctness | Performance |];
+
+sig run_sim : (Setup) ~%~> ()
+fun run_sim(setup) {
+  var n = switch(setup) {
+    case Correctness -> 1000
+    case Performance -> 50000000
+  };
+  var dt = 0.01;
+  physical_state_mgr(fun() { simulation(n, dt) })
+}
+
+fun main() {
+  run_sim(Correctness)
 }
