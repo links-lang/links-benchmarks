@@ -1,8 +1,10 @@
 ############################################################################################
-# N-body simulation using Effects and Handlers: simulating mutation                        #
-# =================================================================                        #
-# 											   #
-# TODO fill this part (reference <simple.links>)                                           #
+# N-body simulation using Effects and Handlers: simulating mutation (optimized version)    #
+# =====================================================================================    #
+#                                                                                          #
+# TODO fill this; note that this file is almost identical to <handlers-muation.links> (<1>)#
+# but crucially the underlying internal state is handled differently (using records and    #
+# less dynamic dispatch here)                                                              #
 #                                                                                          #
 ############################################################################################
 
@@ -20,12 +22,27 @@ typename Name = [| Sun
                  | Uranus
                  | Neptune |];
 
+# differences from <1> below
+
+var names = [ Sun, Jupiter, Saturn, Uranus, Neptune ];
+
 typename Body = ( pos  : Vector3
                 , vel  : Vector3
                 , mass : Scalar );
 
-typename State = Alist(Name, Body);
+var empty_body = ( mass = 0.0, pos = zero3, vel = zero3 ) : Body;
 
+typename State = ( sun     : Body
+                 , jupiter : Body
+                 , saturn  : Body
+                 , uranus  : Body
+                 , neptune : Body );
+
+var empty_state = ( sun     = empty_body
+                  , jupiter = empty_body
+                  , saturn  = empty_body
+                  , uranus  = empty_body
+                  , neptune = empty_body );
 
 # Helper functions:
 
@@ -73,70 +90,57 @@ fun norm(v) {
   sqrt(norm2(v))
 }
 
-## Alist:
-sig assoc : (a, Alist(a,b)) ~> Maybe(b)
-fun assoc(k, alst) {
-  switch (alst) {
-    case [] -> Nothing
-    case ((xk, xv)::rest) -> if (k == xk)
-                               { Just(xv) }
-                             else
-                               { assoc(k, rest) }
+# State: different from <1>
+
+sig access : (Name, State) ~> Body
+fun access(k, state) {
+  switch (k) {
+    case Sun     -> state.sun
+    case Jupiter -> state.jupiter
+    case Saturn  -> state.saturn
+    case Uranus  -> state.uranus
+    case Neptune -> state.neptune
   }
 }
 
-sig upd_assoc : (a, b, Alist(a,b)) ~> Alist(a,b)
-fun upd_assoc(k, v, alst) {
-  switch (alst) {
-    case [] -> [(k,v)]
-    case ((xk, xv)::rest) -> if (k == xk)
-                               { (k, v) :: rest }
-                             else
-                               { (xk, xv) :: upd_assoc(k, v, rest) }
+sig mutate : (Name, Body, State) ~> State
+fun mutate(k, v, state) {
+  switch (k) {
+    case Sun     -> ( state with sun     = v )
+    case Jupiter -> ( state with jupiter = v )
+    case Saturn  -> ( state with saturn  = v )
+    case Uranus  -> ( state with uranus  = v )
+    case Neptune -> ( state with neptune = v )
   }
-}
-
-sig assoc_keys : (Alist(a,b)) ~> [a]
-fun assoc_keys(alst) {
-  map(fst, alst)
 }
 
 # Handler stuff:
 
-sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
-                               , Put:(a, b) {}-> ()
-                               , Keys:() {}-> [a]
-                               , Dump:() {}-> Alist(a,b) |e}~> c)
-               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
+sig statemgr : (State, () { Ask:(Name) {}-> Body
+                          , Put:(Name, Body) {}-> () |e}~> c)
+               {Ask{_},Put{_}|e}~> c
 fun statemgr(state, f) {
   shallowhandle (f()) {
     case Return(v) -> v
 
-    case Ask(k, resume)    -> { var v = assoc(k, state);
+    case Ask(k, resume)    -> { var v = access(k, state);
                                 statemgr(state, fun() { resume(v) }) }
 
-    case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
+    case Put(k, v, resume) -> { var state' = mutate(k, v, state);
                                 statemgr(state', fun() { resume(()) }) }
-
-    case Keys(resume)      -> { var keys = assoc_keys(state);
-                                statemgr(state, fun() { resume(keys) }) }
-
-    case Dump(resume)      -> { statemgr(state, fun() { resume(state) })}
   }
 }
 
+# The rest of the program is essentially the same as the original in
+# <1> (modulo changes to make the code compatible with the new
+# infrastructure). This also demonstrates that the underlying
+# representations are completely transparent to the physics code.
 
 sig ask : (a) {Ask:(a) {}-> b|e}~> b
 fun ask(k) { do Ask(k) }
 
 sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
 fun put(k, v) { do Put(k, v) }
-
-sig keys : () {Keys:() {}-> [a]|e}~> [a]
-fun keys() { do Keys }
-
-sig dump : () {Dump:() {}-> Alist(a,b)|e}~> Alist(a,b)
-fun dump() { do Dump }
 
 # DSL for later
 
@@ -155,25 +159,20 @@ op e @. p { Proj(e, p) }
 
 
 prefix 6 @!;
-sig @! : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Result
+sig @! : (Projection) {Ask:(Name) {}-> Body|e}~> Result
 op @! e {
   var Proj(n, p) = e;
   var b = ask(n);
-  switch (b) {
-    case Nothing -> error("Undefined symbol")
-    case Just(b) -> {
-      switch(p) {
-        case Mass -> S'(b.mass)
-        case Pos  -> V'(b.pos)
-        case Vel  -> V'(b.vel)
-      }
-    }
+  switch(p) {
+    case Mass -> S'(b.mass)
+    case Pos  -> V'(b.pos)
+    case Vel  -> V'(b.vel)
   }
 }
 
 
 prefix 6 @!$;
-sig @!$ : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Scalar
+sig @!$ : (Projection) {Ask:(Name) {}-> Body|e}~> Scalar
 op @!$ e {
   switch(@!e) {
     case S'(v) -> v
@@ -183,7 +182,7 @@ op @!$ e {
 
 
 prefix 6 @!>;
-sig @!> : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Vector3
+sig @!> : (Projection) {Ask:(Name) {}-> Body|e}~> Vector3
 op @!> e {
   switch(@!e) {
     case V'(v) -> v
@@ -196,14 +195,11 @@ sig @=| : (a, b) {Put:(a,b) {}-> ()|e}~> ()
 op n @=| v { put(n, v) }
 
 infix 6 @=;
-sig @= : (Projection, Result) {Ask:(Name) {}-> Maybe(Body),
+sig @= : (Projection, Result) {Ask:(Name) {}-> Body,
                                Put:(Name, Body) {}-> ()|e}~> ()
 op e @= v {
   var Proj(n, p) = e;
-  var b = switch (ask(n)) {
-    case Nothing -> error("Undefined symbol")
-    case Just(b) -> b
-  };
+  var b = ask(n);
   var b' = switch ((p, v)) {
     case (Mass, S'(m)) -> (b with mass = m)
     case (Pos, V'(v)) -> (b with pos = v)
@@ -213,7 +209,7 @@ op e @= v {
 }
 
 infix 6 @=<;
-sig @=< : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+sig @=< : (Projection, Vector3) {Ask:(Name) {}-> Body,
                                  Put:(Name, Body) {}-> ()|e}~> ()
 op e @=< v {
   e @= V'(v)
@@ -221,7 +217,7 @@ op e @=< v {
 
 
 infix 6 @=<+;
-sig @=<+ : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+sig @=<+ : (Projection, Vector3) {Ask:(Name) {}-> Body,
                                  Put:(Name, Body) {}-> ()|e}~> ()
 op e @=<+ v {
   var original = switch(@!e) {
@@ -232,7 +228,7 @@ op e @=<+ v {
 }
 
 infix 6 @=<-;
-sig @=<- : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+sig @=<- : (Projection, Vector3) {Ask:(Name) {}-> Body,
                                  Put:(Name, Body) {}-> ()|e}~> ()
 op e @=<- v {
   var original = switch(@!e) {
@@ -245,20 +241,17 @@ op e @=<- v {
 
 # Initialization of the solar system
 
-sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
-                                    Keys:() {}-> [Name],
+sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Body,
                                     Put:(Name, Body) {}-> ()|_}~> ()
 fun offset_sun_momentum(solar_mass) {
-  var bodies = keys();
   var dp = fold_left(fun(acc, n) {
     acc +++ (@!$ n @. Mass **. @!> n @. Vel)
-  }, zero3, bodies);
+  }, zero3, names);
   var v = (-. 1.0 /. solar_mass) **. dp;
   Sun @. Vel @=< v
 }
 
-sig init_system : () {Ask:(Name) {}-> Maybe(Body),
-                      Keys:() {}-> [Name],
+sig init_system : () {Ask:(Name) {}-> Body,
                       Put:(Name, Body) {}-> ()|_}~> ()
 fun init_system() {
   var pi = 3.141592653589793;
@@ -312,7 +305,7 @@ fun init_system() {
 # Physics
 
 sig physical_state_mgr : (() ~%~> v) ~%~> v
-fun physical_state_mgr(f) { statemgr([], f) }
+fun physical_state_mgr(f) { statemgr(empty_state, f) }
 
 sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
 fun pair_interact(dt)(n1)(n2) {
@@ -344,9 +337,6 @@ fun energy(ns) {
   switch(ns) {
     case [] -> 0.0
     case n::rest -> {
-      # TODO these searches will take long - there could be some
-      # internal optimization (but this is all purposefully
-      # transparent to the physics code)
       var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
       var potential = fold_left(fun (acc, other) {
         var dr = (@!> n@.Pos) --- (@!> other@.Pos);
@@ -369,14 +359,13 @@ fun loop(n, dt, names) {
 
 fun simulation(n, dt) {
   init_system();
-  var system = keys();
 
-  var e = energy(system);
+  var e = energy(names);
   println(floatToString(e));
 
-  loop(n, dt, system);
+  loop(n, dt, names);
 
-  var e = energy(system);
+  var e = energy(names);
   println(floatToString(e))
 }
 
