@@ -49,25 +49,6 @@ var empty_state = ( sun     = empty_body
 sig fst : ((a,b)) -> a
 fun fst((a,_)) { a }
 
-sig snd : ((a,b)) -> b
-fun snd((_,b)) { b }
-
-sig take_until : (a, [a]) ~> [a]
-fun take_until(k, lst) {
-  switch(lst) {
-    case [] -> []
-    case (x::xs) -> if (x == k) [] else x :: take_until(k, xs)
-  }
-}
-
-sig drop_until : (a, [a]) ~> [a]
-fun drop_until(k, lst) {
-  switch(lst) {
-    case [] -> []
-    case (x::xs) -> if (x == k) xs else drop_until(k, xs)
-  }
-}
-
 ## Vectors:
 op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
 op (ux,uy,uz) --- (vx,vy,vz) { (ux -. vx, uy -. vy, uz -. vz ) }

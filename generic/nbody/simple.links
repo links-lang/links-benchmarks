@@ -27,20 +27,7 @@ typename State = [Body];
 
 # Helper functions:
 
-sig fst : ((a,b)) -> a
-fun fst((a,_)) { a }
-
-sig snd : ((a,b)) -> b
-fun snd((_,b)) { b }
-
-sig map2 : ((a,b) ~e~> c, [a], [b]) ~e~> [c]
-fun map2(f, xs, ys) {
-  switch ((xs, ys)) {
-    case ([], []) -> []
-    case (x::xs, y::ys) -> f(x,y) :: map2(f, xs, ys)
-    case _ -> error("Incompatible lists, map2 requires they have the same length.")
-  }
-}
+## Vectors:
 
 sig +++ : (Vector3, Vector3) -> Vector3
 op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
