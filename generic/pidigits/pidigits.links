@@ -12,17 +12,17 @@ typename BigNum = [|BigNumStr:String|];
 
 
 module BigNum {
-# Construct BigNum with an Int
+  # Construct BigNum with an Int
   sig fromInt: (Int) -> BigNum
   fun fromInt(n) { BigNumStr(intToString(n)) }
 
+  # Get String representation of BigNum
+  sig toString: (BigNum) -> String
   fun toString(bn) {
     var BigNumStr(n) = bn;
     n
   }
 }
-
-
 
 typename LFT = (BigNum, BigNum, BigNum, BigNum);
 
@@ -32,6 +32,7 @@ module LFT {
   }
 
   # TODO: Unused?
+  # Get String representation of LFT
   # sig toString : (LFT) -> String
   # fun toString (m) {
   #   var (BigNumStr(a), BigNumStr(b), BigNumStr(c), BigNumStr(d)) = m;
@@ -39,6 +40,7 @@ module LFT {
   # }
 }
 
+# Some operators on BigNum
 op x <+> y {
   var BigNumStr(x) = x;
   var BigNumStr(y) = y;
@@ -57,17 +59,12 @@ op x </> y {
   BigNumStr(JSBigInt.div(x, y))
 }
 
+# Set precedence
 infixl 3 <*>;
 infixl 3 </>;
 infixl 2 <+>;
 
 var unit = LFT.fromInts(1,0,0,1);
-
-
-fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
-
-# Note: Empty string required to avoid addition of integer at client side
-fun concat(xs) { join("", xs) }
 
 fun comp(m1: LFT, m2: LFT) {
   var (q, r, s, t) = m1;
@@ -101,7 +98,7 @@ fun safe(z: LFT, n: BigNum) {
 var cons = comp;
 var init = unit;
 
-# sig stream: (LFT, [LFT]) -> [BigNum]
+sig stream: (LFT, [LFT]) ~> [BigNum]
 fun stream(z, inputs) {
   switch (inputs) {
     case []      -> []
@@ -117,6 +114,13 @@ fun stream(z, inputs) {
 
 var inputMatrixCount = 100;
 
+# Some functions for printing 
+fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
+fun concat(xs) {
+  # Note: Empty string required to avoid addition of integer at client side
+  join("", xs)
+}
+
 # Client stuff
 fun mainPage(_) {
   var _ = spawnClient {
@@ -129,7 +133,6 @@ fun mainPage(_) {
         [(a,b,c,d)]
       } 
     };
-
 
     var resultBigNums= stream(unit, lfts) : [BigNum];
     var resultOutput = concat(map(BigNum.toString, resultBigNums));
