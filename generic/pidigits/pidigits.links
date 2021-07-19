@@ -9,26 +9,34 @@ module JSBigInt{
 
 typename BigNum = [|BigNumStr:String|];
 
-fun bigNum(n) {
-  var numStr = intToString(n);
-  BigNumStr(numStr)
+
+
+module BigNum {
+# Construct BigNum with an Int
+  sig fromInt: (Int) -> BigNum
+  fun fromInt(n) { BigNumStr(intToString(n)) }
+
+  fun toString(bn) {
+    var BigNumStr(n) = bn;
+    n
+  }
 }
 
-fun bigNumToString(bn) {
-  var BigNumStr(n) = bn;
-  n
-}
+
 
 typename LFT = (BigNum, BigNum, BigNum, BigNum);
 
-fun lftFromTuple (a, b, c, d) {
-  (bigNum(a), bigNum(b), bigNum(c), bigNum(d)) : LFT
-}
+module LFT {
+  fun fromInts(a, b, c, d) {
+    (BigNum.fromInt(a), BigNum.fromInt(b), BigNum.fromInt(c), BigNum.fromInt(d)) : LFT
+  }
 
-sig lftToString : (LFT) -> String
-fun lftToString(m) {
-  var (BigNumStr(a), BigNumStr(b), BigNumStr(c), BigNumStr(d)) = m;
-  ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ d ^^ ")")
+  # TODO: Unused?
+  # sig toString : (LFT) -> String
+  # fun toString (m) {
+  #   var (BigNumStr(a), BigNumStr(b), BigNumStr(c), BigNumStr(d)) = m;
+  #   ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ d ^^ ")")
+  # }
 }
 
 op x <+> y {
@@ -53,7 +61,7 @@ infixl 3 <*>;
 infixl 3 </>;
 infixl 2 <+>;
 
-var unit = lftFromTuple(1,0,0,1);
+var unit = LFT.fromInts(1,0,0,1);
 
 
 fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
@@ -77,16 +85,16 @@ fun floorExtr(m, x) {
 }
 
 fun next(z: LFT) {
-  floorExtr(z, bigNum(3))
+  floorExtr(z, BigNum.fromInt(3))
 }
 
 fun prod(z: LFT, n: BigNum) {
-  var m = (bigNum(10), bigNum(-10)<*>n, bigNum(0), bigNum(1));
+  var m = (BigNum.fromInt(10), BigNum.fromInt(-10)<*>n, BigNum.fromInt(0), BigNum.fromInt(1));
   comp(m, z): LFT
 }
 
 fun safe(z: LFT, n: BigNum) {
-  n == floorExtr(z, bigNum(4)): Bool
+  n == floorExtr(z, BigNum.fromInt(4)): Bool
 }
 
 
@@ -114,17 +122,17 @@ fun mainPage(_) {
   var _ = spawnClient {
     var lfts = {
       for (k <- [1..inputMatrixCount]) {
-        var a = bigNum(k);
-        var b = bigNum(4)<*>bigNum(k)<+>bigNum(2);
-        var c = bigNum(0);
-        var d = bigNum(2)<*>bigNum(k)<+>bigNum(1);
+        var a = BigNum.fromInt(k);
+        var b = BigNum.fromInt(4)<*>BigNum.fromInt(k)<+>BigNum.fromInt(2);
+        var c = BigNum.fromInt(0);
+        var d = BigNum.fromInt(2)<*>BigNum.fromInt(k)<+>BigNum.fromInt(1);
         [(a,b,c,d)]
       } 
     };
 
 
     var resultBigNums= stream(unit, lfts) : [BigNum];
-    var resultOutput = concat(map(bigNumToString, resultBigNums));
+    var resultOutput = concat(map(BigNum.toString, resultBigNums));
 
     println(resultOutput)
 
