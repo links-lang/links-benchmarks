@@ -1,23 +1,60 @@
-
-
-alien javascript "/js/div.js" {
-    # String represents a number
-    div: (String, String) -> String;
-    add: (String, String) -> String;
-    mult: (String, String) -> String;
+module JSBigInt{
+  alien javascript "/js/div.js" {
+      # String represents a number
+      div: (String, String) -> String;
+      add: (String, String) -> String;
+      mult: (String, String) -> String;
+  }
 }
 
-typename LFT = (String, String, String, String);
+typename BigNum = [|BigNumStr:String|];
 
+fun bigNum(n) {
+  var numStr = intToString(n);
+  BigNumStr(numStr)
+}
 
-# Convert LFT into String representation
-sig toStr : (LFT) -> String
-fun toStr(m) {
-  var (a, b, c, d) = m;
+fun bigNumToString(bn) {
+  var BigNumStr(n) = bn;
+  n
+}
+
+typename LFT = (BigNum, BigNum, BigNum, BigNum);
+
+fun lftFromTuple (a, b, c, d) {
+  (bigNum(a), bigNum(b), bigNum(c), bigNum(d)) : LFT
+}
+
+sig lftToString : (LFT) -> String
+fun lftToString(m) {
+  var (BigNumStr(a), BigNumStr(b), BigNumStr(c), BigNumStr(d)) = m;
   ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ d ^^ ")")
 }
 
-var unit = ("1", "0", "0", "1") : LFT;
+op x <+> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.add(x, y))
+}
+
+op x <*> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.mult(x, y))
+}
+
+op x </> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.div(x, y))
+}
+
+infixl 3 <*>;
+infixl 3 </>;
+infixl 2 <+>;
+
+var unit = lftFromTuple(1,0,0,1);
+
 
 fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
 
@@ -27,39 +64,37 @@ fun concat(xs) { join("", xs) }
 fun comp(m1: LFT, m2: LFT) {
   var (q, r, s, t) = m1;
   var (u, v, w, x) = m2;
-  (add(mult(q, u), mult(r, w)),
-  add(mult(q, v), mult(r, x)),
-  add(mult(s, u), mult(t, w)),
-  add(mult(s, v), mult(t, x)))
+  (q<*>u <+> r<*>w, q<*>v <+> r<*>x,
+   s<*>u <+> t<*>w, s<*>v <+> t<*>x)
 }
 
-sig floorExtr : (LFT, String) -> String 
 fun floorExtr(m, x) {
-  var numerator = add(mult(first(m), x), second(m));
-  var denominator = add(mult(third(m), x), fourth(m));
+  var (q, r, s, t) = m;
+  var numerator = (q <*> x <+> r);
+  var denominator = (s <*> x <+> t);
+  (numerator </> denominator) : BigNum
   # Log - division: println("Dividing " ^^ numerator ^^ "by" ^^ denominator);
-  div(numerator, denominator)
 }
 
 fun next(z: LFT) {
-  floorExtr(z, "3")
+  floorExtr(z, bigNum(3))
 }
 
-fun prod(z: LFT, n: String) {
-  var m = ("10", mult("-10", n), "0", "1");
+fun prod(z: LFT, n: BigNum) {
+  var m = (bigNum(10), bigNum(-10)<*>n, bigNum(0), bigNum(1));
   comp(m, z): LFT
 }
 
-fun safe(z: LFT, n: String) {
-  n == floorExtr(z, "4"): Bool
+fun safe(z: LFT, n: BigNum) {
+  n == floorExtr(z, bigNum(4)): Bool
 }
 
 
-# TODO: Use alias
-# var cons = comp;
-# var init = unit;
+var cons = comp;
+var init = unit;
 
-fun stream(z: LFT, inputs: [LFT]) {
+# sig stream: (LFT, [LFT]) -> [BigNum]
+fun stream(z, inputs) {
   switch (inputs) {
     case []      -> []
     case (x::xs) -> {
@@ -79,18 +114,18 @@ fun mainPage(_) {
   var _ = spawnClient {
     var lfts = {
       for (k <- [1..inputMatrixCount]) {
-        var a = intToString(k);
-        [(a, add(mult("4", a), "2"), "0", add(mult("2", a), "1"))]
+        var a = bigNum(k);
+        var b = bigNum(4)<*>bigNum(k)<+>bigNum(2);
+        var c = bigNum(0);
+        var d = bigNum(2)<*>bigNum(k)<+>bigNum(1);
+        [(a,b,c,d)]
       } 
     };
 
-    # Log - lfts calculation: println(join("\n", map(toStr, lfts)));
 
-    var resultBigNums= stream(unit, lfts) : [String];
+    var resultBigNums= stream(unit, lfts) : [BigNum];
+    var resultOutput = concat(map(bigNumToString, resultBigNums));
 
-    # var resultBigNums= map(fun (n) { "\"" ^^ n ^^ "\"," }, stream(unit, lfts));
-    var resultOutput = concat(resultBigNums);
-    # var resultOutput = join(",", resultBigNums) ^^ "]";
     println(resultOutput)
 
   };
