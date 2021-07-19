@@ -53,9 +53,9 @@ fun safe(z: LFT, n: String) {
 }
 
 
-var cons = comp;
-
-var init = unit;
+# TODO: Use alias
+# var cons = comp;
+# var init = unit;
 
 fun stream(z: LFT, inputs: [LFT]) {
   switch (inputs) {
@@ -65,7 +65,7 @@ fun stream(z: LFT, inputs: [LFT]) {
       if (safe(z, y))
         y :: stream(prod(z, y), x::xs)
       else
-        stream(cons(z, x), xs)
+        stream(comp(z, x), xs)
     }
   }
 }
