@@ -33,9 +33,8 @@ fun comp(m1: LFT, m2: LFT) {
 
 sig floorExtr : (LFT, String) -> String 
 fun floorExtr(m, x) {
-  var (q, r, s, t) = m;
-  var numerator = mult(q, add(x, r));
-  var denominator = mult(s, add(x, t));
+  var numerator = add(mult(first(m), x), second(m));
+  var denominator = add(mult(third(m), x), fourth(m));
   div(numerator, denominator)
 }
 
