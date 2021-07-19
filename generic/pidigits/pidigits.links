@@ -1,5 +1,5 @@
 module JSBigInt{
-  alien javascript "/js/div.js" {
+  alien javascript "/js/BigInt.js" {
       # String represents a number
       div: (String, String) -> String;
       add: (String, String) -> String;
