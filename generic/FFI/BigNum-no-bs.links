@@ -70,21 +70,6 @@ fun stream(z: LFT, inputs: [LFT]) {
   }
 }
 
-fun stream(z: LFT, inputs: [LFT]) {
-  switch (inputs) {
-    case []      -> []
-    case (x::xs) -> {
-      var y = next(z); 
-      if (safe(z, y))
-        y :: stream(prod(z, y), x::xs)
-      else
-        stream(cons(z, x), xs)
-    }
-  }
-}
-
-
-
 var n = 5;
 
 # Client stuff
