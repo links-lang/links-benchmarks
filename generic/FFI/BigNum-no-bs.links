@@ -14,7 +14,7 @@ typename LFT = (String, String, String, String);
 sig toStr : (LFT) -> String
 fun toStr(m) {
   var (a, b, c, d) = m;
-  ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ b ^^ ")")
+  ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ d ^^ ")")
 }
 
 var unit = ("1", "0", "0", "1") : LFT;
