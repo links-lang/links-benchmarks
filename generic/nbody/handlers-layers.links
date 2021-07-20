@@ -46,9 +46,8 @@ fun assoc_keys(alst) {
 
 sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
                                , Put:(a, b) {}-> ()
-                               , Keys:() {}-> [a]
                                , Dump:() {}-> Alist(a,b) |e}~> c)
-               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
+               {Ask{_},Put{_},Dump{_}|e}~> c
 fun statemgr(state, f) {
   shallowhandle (f()) {
     case Return(v) -> v
@@ -58,9 +57,6 @@ fun statemgr(state, f) {
 
     case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
                                 statemgr(state', fun() { resume(()) }) }
-
-    case Keys(resume)      -> { var keys = assoc_keys(state);
-                                statemgr(state, fun() { resume(keys) }) }
 
     case Dump(resume)      -> { statemgr(state, fun() { resume(state) })}
   }
@@ -73,11 +69,11 @@ fun ask(k) { do Ask(k) }
 sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
 fun put(k, v) { do Put(k, v) }
 
-sig keys : () {Keys:() {}-> [a]|e}~> [a]
-fun keys() { do Keys }
-
+# debug
 sig dump : () {Dump:() {}-> Alist(a,b)|e}~> Alist(a,b)
 fun dump() { do Dump }
+
+fun local_state(f) { statemgr([], f) }
 
 
 ############ PHYSICS ############
@@ -189,79 +185,93 @@ typename Body = ( mass : Float
                 , pos  : Vector3
                 , vel  : Vector3 );
 
-# sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
-# fun pair_interact(dt)(n1)(n2) {
-#   var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
-#   var d2 = norm2(dr);
-#   var mag = dt /. (d2 *. sqrt(d2));
+sig body : (Body) { Ask:(Property) {}-> Maybe(Result)
+                  , Put:(Property, Result) {}-> ()
+                  , Interact:(Scalar, Vector3, Scalar) {}-> (Scalar, Vector3)
+                  , Spawn:(Body) {}-> Vector3 |e}~> ()
+fun body(bd) {
+  # momentum correction obtained here
+  var delta_p = do Spawn(bd);
 
-#   var fc1 = (@!$ n2 @. Mass) *. mag;
-#   var fc2 = (@!$ n1 @. Mass) *. mag;
+  Mass @=$ bd.mass;
+  Pos  @=< bd.pos;
+  # (stellar) momentum correction; may not work well for multi-star systems
+  Vel  @=< bd.vel +++ ((1.0 /. bd.mass) **. delta_p);
 
-#   n1 @. Vel @=<- (fc1 **. dr);
-#   n2 @. Vel @=<+ (fc2 **. dr)
-# }
-
-# sig advance : (Scalar, [Name]) ~%~> ()
-# fun advance(dt, ns) {
-#   switch (ns) {
-#     case [] -> ()
-#     case (n::rest) -> {
-#       iter(pair_interact(dt)(n), rest);
-#       n @. Pos @=<+ (dt **. (@!> n @. Vel));
-#       advance(dt, rest)
-#     }
-#   }
-# }
-
-# sig energy : ([Name]) ~%~> Scalar
-# fun energy(ns) {
-#   switch(ns) {
-#     case [] -> 0.0
-#     case n::rest -> {
-#       var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
-#       var potential = fold_left(fun (acc, other) {
-#         var dr = (@!> n@.Pos) --- (@!> other@.Pos);
-#         var d = norm(dr);
-#         var pot = (@!$ n@.Mass) *. (@!$ other@.Mass) /. d;
-#         acc -. pot
-#       }, 0.0, rest);
-
-#       kinetic +. potential +. energy(rest)
-#     }
-#   }
-# }
-
-sig body : (Bool, Body) { Ask:(Property) {}-> Maybe(Result)
-                        , Put:(Property, Result) {}-> ()
-                        , Interact:(Scalar, Vector3) {}-> (Scalar, Vector3)
-                        , Spawn:(Body) {}-> ()
-                        , SolarCorrection:() {}-> Vector3}~> %
-                                              # type without sugar here is horrendous
-fun body(is_sun, (mass=mass, pos=pos, vel=vel)) {
-  do Spawn;
-
-  Mass @=$ mass;
-  Pos  @=< pos;
-  Vel  @=< vel;
-
-  if (is_sun)
-    { Vel @=< do SolarCorrection() }
-  else { () };
-
-  fun loop() {
-    var (dt, delta_v) = do Interact(@!$ Mass, @!> Pos);
-    var vel = @!> Vel +++ delta_v;
-    Vel @=< vel;
-    Pos @=<+ dt **. vel;
-    loop()
+  fun energy(mass, vel) {
+    0.5 *. mass *. norm2(vel)
   }
 
-  loop
+  fun advance() {
+    # TODO so many accesses will be inefficient AF if I keep using
+    # Alists, but eh, demonstration purposes
+    var mass = @!$ Mass;
+    var pos  = @!> Pos;
+    var vel  = @!> Vel;
+
+    var (dt, delta_v) = do Interact(mass, pos, energy(mass, vel));
+    var vel = @!> Vel +++ delta_v;
+
+    Vel @=< vel;
+    Pos @=<+ dt **. vel;
+
+    advance()
+  }
+
+  advance()
 }
 
-fun sol(bd) { body(true, bd) }
-fun planet(bd) { body(false, bd) }
+# The Physical Universe:
+
+sig handle_spawn : ([() {Spawn:(Body) {}-> Vector3|e}~> ()])
+                   {Spawn{-}|e}~>
+                   [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())]
+fun handle_spawn(rest) {
+  switch (rest) {
+    case [] -> []
+    case b::rest ->
+      var (bd, resume) = shallowhandle(b()) {
+        case Return() -> error("Incompatible body-function.")
+        case Spawn(bd, resume) -> (bd, resume)
+      };
+      (bd, resume) :: handle_spawn(rest)
+  }
+}
+
+fun universe(n_iter, dt, bodies) {
+  # TODO maybe the local state will happen before universe is given the bodies
+  var bodies = map(fun (f)() { local_state(f) }, bodies);
+  var bodies = handle_spawn(bodies);
+
+  var dp = fold_left(fun (acc, ((mass=mass, vel=vel|_), _)) {
+    acc --- (mass **. vel)
+  }, zero3, bodies);
+
+  # find the most massive object - the star of the system
+  var (sun, rest) = fold_left(fun ((max, acc), (body, resumption)) {
+    switch (max) {
+      case Nothing -> (Just((body, resumption)), acc)
+      case Just((sun, sun_res)) -> {
+        if (body.mass > sun.mass)
+          { (Just((body, resumption)), (sun, sun_res) :: acc) }
+        else
+          { (max, (body, resumption) :: acc) }
+      }
+    }
+  }, (Nothing, []), bodies);
+
+  # correction will be applied to the sun
+  var sun = switch(sun) {
+    case Nothing -> error("Empty universe")
+    case Just((_, resume)) -> fun () { resume(dp) }
+  };
+
+  var rest = map(fun((_, resume))() { resume(zero3) }, rest);
+
+  var bodies = sun :: rest;
+
+  ()
+}
 
 # Initialization of the solar system
 
