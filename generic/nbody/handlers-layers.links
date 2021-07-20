@@ -187,7 +187,7 @@ typename Body = ( mass : Float
 
 sig body : (Body) { Ask:(Property) {}-> Maybe(Result)
                   , Put:(Property, Result) {}-> ()
-                  , Interact:(Scalar, Vector3, Scalar) {}-> (Scalar, Vector3)
+                  , Interact:(Body) {}-> (Scalar, Vector3)
                   , Spawn:(Body) {}-> Vector3 |e}~> ()
 fun body(bd) {
   # momentum correction obtained here
@@ -198,10 +198,6 @@ fun body(bd) {
   # (stellar) momentum correction; may not work well for multi-star systems
   Vel  @=< bd.vel +++ ((1.0 /. bd.mass) **. delta_p);
 
-  fun energy(mass, vel) {
-    0.5 *. mass *. norm2(vel)
-  }
-
   fun advance() {
     # TODO so many accesses will be inefficient AF if I keep using
     # Alists, but eh, demonstration purposes
@@ -209,9 +205,14 @@ fun body(bd) {
     var pos  = @!> Pos;
     var vel  = @!> Vel;
 
-    var (dt, delta_v) = do Interact(mass, pos, energy(mass, vel));
+    # TODO make this Δp: makes more sense to give the body a force than Δv
+    var (dt, delta_v) = do Interact((mass=mass, pos=pos, vel=vel)); # TODO give v or E?
     var vel = @!> Vel +++ delta_v;
 
+    # the only advantage (as far as I can tell) is that the body will
+    # manage its own state, and only interact with the universe;
+    # therefore we can model active matter - bodies doing their own
+    # thing, not just deterministically following the forces
     Vel @=< vel;
     Pos @=<+ dt **. vel;
 
@@ -239,7 +240,8 @@ fun handle_spawn(rest) {
 }
 
 fun universe(n_iter, dt, bodies) {
-  # TODO maybe the local state will happen before universe is given the bodies
+  # TODO maybe (probably!) the local state will happen before universe
+  # is given the bodies
   var bodies = map(fun (f)() { local_state(f) }, bodies);
   var bodies = handle_spawn(bodies);
 
@@ -270,7 +272,13 @@ fun universe(n_iter, dt, bodies) {
 
   var bodies = sun :: rest;
 
-  ()
+  # var energy_start = energy();
+
+  # handle interactions until n_iter
+
+  # energy again
+
+  (start=0.0:Scalar, end=0.0:Scalar)
 }
 
 # Initialization of the solar system
