@@ -9,8 +9,6 @@ module JSBigInt{
 
 typename BigNum = [|BigNumStr:String|];
 
-
-
 module BigNum {
   # Construct BigNum with an Int
   sig fromInt: (Int) -> BigNum
@@ -94,7 +92,6 @@ fun safe(z: LFT, n: BigNum) {
   n == floorExtr(z, BigNum.fromInt(4)): Bool
 }
 
-
 var cons = comp;
 var init = unit;
 
@@ -115,34 +112,59 @@ fun stream(z, inputs) {
 var inputMatrixCount = 100;
 
 # Some functions for printing 
-fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
+fun join(sep, xs) { fold_left1(fun(x,y) { "" ^^ x ^^ sep ^^ y }, xs) }
 # Note: Empty string required to avoid addition of integer at client side
 fun concat(xs) { join("", xs) }
 
 sig printPidigits: ([BigNum]) ~> ()
 fun printPidigits(digits) {
-  fun printPidigits'(digits, charCount, lineCount) {
+  fun printPidigits'(digits, lineCount) {
     switch (digits) {
-      case [] -> {
+      case [] -> ()
+      case xs -> {
+        var fstTenNums = take(10, digits);
+        var tail = drop(10, digits);
+
+        var charCount = length(fstTenNums);
         var fillSpaceCount = 10 - charCount;
         println(
-          concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
+          concat(map(BigNum.toString, fstTenNums))
+          # TODO: fix digit count
+          # ^^ concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
           ^^ intToString(lineCount * 10 + charCount)        # Digit count
-        )
-      }
-      case (x :: xs) -> {
-        if (charCount == 10) {
-          println(BigNum.toString(x) ^^ "\t:" ^^ intToString((lineCount + 1)*10));
-          printPidigits'(xs, 0, lineCount + 1)
-        } else {
-          print(BigNum.toString(x));
-          printPidigits'(xs, charCount + 1, lineCount + 1)
-        }
+        );
+
+        printPidigits'(tail, lineCount + 1)
       }
     }
   }
-  printPidigits'(digits, 0, 0)
+  printPidigits'(digits, 0)
 }
+
+  # Following version doesn't wor
+  # Browsers do not support console.log *without* new line.
+
+  # fun printPidigits'(digits, charCount, lineCount) {
+  #   switch (digits) {
+  #     case [] -> {
+  #       var fillSpaceCount = 10 - charCount;
+  #       println(
+  #         concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
+  #         ^^ intToString(lineCount * 10 + charCount)        # Digit count
+  #       )
+  #     }
+  #     case (x :: xs) -> {
+  #       if (charCount == 10) {
+  #         println(BigNum.toString(x) ^^ "\t:" ^^ intToString((lineCount + 1)*10));
+  #         printPidigits'(xs, 0, lineCount + 1)
+  #       } else {
+  #         print(BigNum.toString(x));
+  #         printPidigits'(xs, charCount + 1, lineCount + 1)
+  #       }
+  #     }
+  #   }
+  # }
+  # printPidigits'(digits, 0, 0)
 
 # Client stuff
 fun mainPage(_) {
