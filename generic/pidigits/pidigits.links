@@ -141,31 +141,6 @@ fun printPidigits(digits) {
   printPidigits'(digits, 0)
 }
 
-  # Following version doesn't wor
-  # Browsers do not support console.log *without* new line.
-
-  # fun printPidigits'(digits, charCount, lineCount) {
-  #   switch (digits) {
-  #     case [] -> {
-  #       var fillSpaceCount = 10 - charCount;
-  #       println(
-  #         concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
-  #         ^^ intToString(lineCount * 10 + charCount)        # Digit count
-  #       )
-  #     }
-  #     case (x :: xs) -> {
-  #       if (charCount == 10) {
-  #         println(BigNum.toString(x) ^^ "\t:" ^^ intToString((lineCount + 1)*10));
-  #         printPidigits'(xs, 0, lineCount + 1)
-  #       } else {
-  #         print(BigNum.toString(x));
-  #         printPidigits'(xs, charCount + 1, lineCount + 1)
-  #       }
-  #     }
-  #   }
-  # }
-  # printPidigits'(digits, 0, 0)
-
 # Client stuff
 fun mainPage(_) {
   var _ = spawnClient {
