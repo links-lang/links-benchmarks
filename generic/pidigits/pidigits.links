@@ -1,6 +1,6 @@
 module JSBigInt{
   alien javascript "/js/BigInt.js" {
-      # String represents a number
+      # String represents a number here
       div: (String, String) -> String;
       add: (String, String) -> String;
       mult: (String, String) -> String;
@@ -28,14 +28,6 @@ module LFT {
   fun fromInts(a, b, c, d) {
     (BigNum.fromInt(a), BigNum.fromInt(b), BigNum.fromInt(c), BigNum.fromInt(d)) : LFT
   }
-
-  # TODO: Unused?
-  # Get String representation of LFT
-  # sig toString : (LFT) -> String
-  # fun toString (m) {
-  #   var (BigNumStr(a), BigNumStr(b), BigNumStr(c), BigNumStr(d)) = m;
-  #   ("(" ^^ a ^^ "," ^^ b ^^ "," ^^ c ^^ "," ^^ d ^^ ")")
-  # }
 }
 
 # Some operators on BigNum
@@ -57,7 +49,7 @@ op x </> y {
   BigNumStr(JSBigInt.div(x, y))
 }
 
-# Set precedence
+# Set operator precedence
 infixl 3 <*>;
 infixl 3 </>;
 infixl 2 <+>;
@@ -76,7 +68,6 @@ fun floorExtr(m, x) {
   var numerator = (q <*> x <+> r);
   var denominator = (s <*> x <+> t);
   (numerator </> denominator) : BigNum
-  # Log - division: println("Dividing " ^^ numerator ^^ "by" ^^ denominator);
 }
 
 fun next(z: LFT) {
@@ -113,7 +104,7 @@ var inputMatrixCount = 100;
 
 # Some functions for printing 
 fun join(sep, xs) { fold_left1(fun(x,y) { "" ^^ x ^^ sep ^^ y }, xs) }
-# Note: Empty string required to avoid addition of integer at client side
+# Note: Empty string required to avoid addition of integer in JS 
 fun concat(xs) { join("", xs) }
 
 sig printPidigits: ([BigNum]) ~> ()
@@ -141,7 +132,6 @@ fun printPidigits(digits) {
   printPidigits'(digits, 0)
 }
 
-# Client stuff
 fun mainPage(_) {
   var _ = spawnClient {
     var lfts = {
