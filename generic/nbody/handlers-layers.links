@@ -88,10 +88,6 @@ typename Vector3 = Triple(Float);
 var zero3 = (0.0, 0.0, 0.0) : Vector3;
 typename Scalar = Float;
 
-typename Body = ( pos  : Vector3
-                , vel  : Vector3
-                , mass : Scalar );
-
 infixl 5 +++;
 op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
 infixl 5 ---;
@@ -124,18 +120,12 @@ typename Property = [| Mass
 typename Result = [| S':Scalar | V':Vector3 |];
 
 prefix 6 @!;
-# sig @! : (Property) {Ask:(Property) {}-> Maybe(Result)|e}~> Result
+sig @! : (Property) {Ask:(Property) {}-> Maybe(Result)|e}~> Result
 op @! p {
   var v = ask(p);
   switch (v) {
     case Nothing -> error("Undefined symbol")
-    case Just(v) -> {
-      switch(p) {
-        case Mass -> S'(v)
-        case Pos  -> V'(v)
-        case Vel  -> V'(v)
-      }
-    }
+    case Just(v) -> v
   }
 }
 
@@ -174,22 +164,22 @@ op p @=$ s {
 
 infix 4 @=<;
 sig @=< : (Property, Vector3) ~%~> ()
-op e @=< v {
-  e @= V'(v)
+op p @=< v {
+  p @= V'(v)
 }
 
 infix 4 @=<+;
 sig @=<+ : (Property, Vector3) {Ask:(Property) {}-> Maybe(Result),
                                 Put:(Property, Result) {}-> ()|e}~> ()
 op p @=<+ v {
-  e @=< (@!> e) +++ v
+  p @=< (@!> p) +++ v
 }
 
 infix 4 @=<-;
 sig @=<- : (Property, Vector3) {Ask:(Property) {}-> Maybe(Result),
                                 Put:(Property, Result) {}-> ()|e}~> ()
 op p @=<- v {
-  e @=< (@!> e) --- v
+  p @=< (@!> p) --- v
 }
 
 
@@ -242,25 +232,36 @@ typename Body = ( mass : Float
 #   }
 # }
 
-sig body : (Body) ~%~> ()
-fun body(body) {
+sig body : (Bool, Body) { Ask:(Property) {}-> Maybe(Result)
+                        , Put:(Property, Result) {}-> ()
+                        , Interact:(Scalar, Vector3) {}-> (Scalar, Vector3)
+                        , Spawn:(Body) {}-> ()
+                        , SolarCorrection:() {}-> Vector3}~> %
+                                              # type without sugar here is horrendous
+fun body(is_sun, (mass=mass, pos=pos, vel=vel)) {
   do Spawn;
 
-  Mass @=$ body.mass;
-  Pos  @=< body.pos;
-  Vel  @=< body.vel;
+  Mass @=$ mass;
+  Pos  @=< pos;
+  Vel  @=< vel;
+
+  if (is_sun)
+    { Vel @=< do SolarCorrection() }
+  else { () };
 
   fun loop() {
     var (dt, delta_v) = do Interact(@!$ Mass, @!> Pos);
     var vel = @!> Vel +++ delta_v;
-    Self @. Vel @=< vel;
-    Self @. Pos @=<+ dt **. vel;
+    Vel @=< vel;
+    Pos @=<+ dt **. vel;
     loop()
   }
 
-  loop()
+  loop
 }
 
+fun sol(bd) { body(true, bd) }
+fun planet(bd) { body(false, bd) }
 
 # Initialization of the solar system
 
@@ -330,25 +331,25 @@ fun body(body) {
 
 ############ PROGRAM ENTRY ############
 
-fun simulation(n, dt) {
-  init_system()
-}
+# fun simulation(n, dt) {
+#   init_system()
+# }
 
-typename Setup = [| Correctness | Performance |];
+# typename Setup = [| Correctness | Performance |];
 
-sig run_sim : (Setup) ~%~> ()
-fun run_sim(setup) {
-  var n = switch(setup) {
-    case Correctness -> 1000
-    case Performance -> 50000000
-  };
-  var dt = 0.01;
-  # TODO run simulation
-  ()
-}
+# sig run_sim : (Setup) ~%~> ()
+# fun run_sim(setup) {
+#   var n = switch(setup) {
+#     case Correctness -> 1000
+#     case Performance -> 50000000
+#   };
+#   var dt = 0.01;
+#   # TODO run simulation
+#   ()
+# }
 
-fun main() {
-  run_sim(Correctness)
-}
+# fun main() {
+#   run_sim(Correctness)
+# }
 
 
