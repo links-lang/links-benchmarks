@@ -86,21 +86,25 @@ fun safe(z: LFT, n: BigNum) {
 var cons = comp;
 var init = unit;
 
-sig stream: (LFT, [LFT]) ~> [BigNum]
-fun stream(z, inputs) {
-  switch (inputs) {
-    case []      -> []
-    case (x::xs) -> {
-      var y = next(z); 
-      if (safe(z, y))
-        y :: stream(prod(z, y), x::xs)
-      else
-        stream(comp(z, x), xs)
-    }
+sig stream: (LFT, Int, Int, Int) ~> [BigNum]
+fun stream(z, lftIndex, digitCount, n) {
+  if (digitCount == n)
+    []
+  else {
+    var x = { 
+      var a = BigNum.fromInt(lftIndex);
+      var b = BigNum.fromInt(4)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(2);
+      var c = BigNum.fromInt(0);
+      var d = BigNum.fromInt(2)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(1);
+      (a,b,c,d) : LFT
+    };
+    var y = next(z); 
+    if (safe(z, y))
+      y :: stream(prod(z, y), lftIndex, digitCount + 1, n)
+    else
+      stream(comp(z, x), lftIndex + 1, digitCount, n)
   }
 }
-
-var inputMatrixCount = 100;
 
 # Some functions for printing 
 fun join(sep, xs) { fold_left1(fun(x,y) { "" ^^ x ^^ sep ^^ y }, xs) }
@@ -133,18 +137,11 @@ fun printPidigits(digits) {
 }
 
 fun mainPage(_) {
-  var _ = spawnClient {
-    var lfts = {
-      for (k <- [1..inputMatrixCount]) {
-        var a = BigNum.fromInt(k);
-        var b = BigNum.fromInt(4)<*>BigNum.fromInt(k)<+>BigNum.fromInt(2);
-        var c = BigNum.fromInt(0);
-        var d = BigNum.fromInt(2)<*>BigNum.fromInt(k)<+>BigNum.fromInt(1);
-        [(a,b,c,d)]
-      } 
-    };
+  # Input: Number of digits of pi requested
+  var n = 99;
 
-    var resultBigNums= stream(unit, lfts) : [BigNum];
+  var _ = spawnClient {
+    var resultBigNums= stream(unit, 1, 0, n) : [BigNum];
     printPidigits(resultBigNums)
   };
 
