@@ -1,3 +1,8 @@
+# Pi digit generator
+# Algorithm Source:
+#   Unbounded Spigot Algorithms for the Digits of Pi
+#   [http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/spigot.pdf]
+
 module JSBigInt{
   alien javascript "/js/BigInt.js" {
       # String represents a number here
@@ -7,6 +12,7 @@ module JSBigInt{
   }
 }
 
+# Represent integer with an arbitrary precision
 typename BigNum = [|BigNumStr:String|];
 
 module BigNum {
@@ -22,15 +28,17 @@ module BigNum {
   }
 }
 
+# Represent 2x2 matrix
 typename LFT = (BigNum, BigNum, BigNum, BigNum);
 
 module LFT {
+  # Construct LFT from four integers
   fun fromInts(a, b, c, d) {
     (BigNum.fromInt(a), BigNum.fromInt(b), BigNum.fromInt(c), BigNum.fromInt(d)) : LFT
   }
 }
 
-# Some operators on BigNum
+# Arithmetic operators on BigNum
 op x <+> y {
   var BigNumStr(x) = x;
   var BigNumStr(y) = y;
@@ -54,8 +62,11 @@ infixl 3 <*>;
 infixl 3 </>;
 infixl 2 <+>;
 
+# Unit matrix
 var unit = LFT.fromInts(1,0,0,1);
 
+# Matrix multiplication
+sig comp: (LFT, LFT) -> LFT
 fun comp(m1: LFT, m2: LFT) {
   var (q, r, s, t) = m1;
   var (u, v, w, x) = m2;
@@ -63,24 +74,29 @@ fun comp(m1: LFT, m2: LFT) {
    s<*>u <+> t<*>w, s<*>v <+> t<*>x)
 }
 
+sig floorExtr: (LFT, BigNum) -> BigNum
 fun floorExtr(m, x) {
   var (q, r, s, t) = m;
   var numerator = (q <*> x <+> r);
   var denominator = (s <*> x <+> t);
-  (numerator </> denominator) : BigNum
+  (numerator </> denominator)
 }
 
-fun next(z: LFT) {
+sig next: LFT -> BigNum
+fun next(z) {
   floorExtr(z, BigNum.fromInt(3))
 }
 
-fun prod(z: LFT, n: BigNum) {
-  var m = (BigNum.fromInt(10), BigNum.fromInt(-10)<*>n, BigNum.fromInt(0), BigNum.fromInt(1));
-  comp(m, z): LFT
+sig prod: (LFT, BigNum) -> LFT
+fun prod(z, n) {
+  var m = (BigNum.fromInt(10), BigNum.fromInt(-10)<*>n,
+           BigNum.fromInt(0), BigNum.fromInt(1));
+  comp(m, z)
 }
 
-fun safe(z: LFT, n: BigNum) {
-  n == floorExtr(z, BigNum.fromInt(4)): Bool
+sig safe: (LFT, BigNum) -> Bool
+fun safe(z, n) {
+  n == floorExtr(z, BigNum.fromInt(4))
 }
 
 var cons = comp;
@@ -91,13 +107,12 @@ fun stream(z, lftIndex, digitCount, n) {
   if (digitCount == n)
     []
   else {
-    var x = { 
-      var a = BigNum.fromInt(lftIndex);
-      var b = BigNum.fromInt(4)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(2);
-      var c = BigNum.fromInt(0);
-      var d = BigNum.fromInt(2)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(1);
-      (a,b,c,d) : LFT
-    };
+    var x = ( 
+      BigNum.fromInt(lftIndex),
+      BigNum.fromInt(4)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(2),
+      BigNum.fromInt(0),
+      BigNum.fromInt(2)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(1)
+    ): LFT;
     var y = next(z); 
     if (safe(z, y))
       y :: stream(prod(z, y), lftIndex, digitCount + 1, n)
@@ -117,11 +132,13 @@ fun printPidigits(digits) {
     switch (digits) {
       case [] -> ()
       case xs -> {
+        # Take first 10 digits to print
         var fstTenNums = take(10, digits);
-        var tail = drop(10, digits);
 
+        # Calculate required number of spaces for formatting
         var charCount = length(fstTenNums);
         var fillSpaceCount = 10 - charCount;
+
         println(
           concat(map(BigNum.toString, fstTenNums))          # Digits  
           ^^ implode(replicate(fillSpaceCount, ' '))        # Whitespace
@@ -129,6 +146,8 @@ fun printPidigits(digits) {
           ^^ intToString(lineCount * 10 + charCount)        # Digit count
         );
 
+        # Tail-recurse with the remaining digits
+        var tail = drop(10, digits);
         printPidigits'(tail, lineCount + 1)
       }
     }
