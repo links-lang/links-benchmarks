@@ -128,9 +128,9 @@ fun printPidigits(digits) {
         var charCount = length(fstTenNums);
         var fillSpaceCount = 10 - charCount;
         println(
-          concat(map(BigNum.toString, fstTenNums))
-          # TODO: fix digit count
-          # ^^ concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
+          concat(map(BigNum.toString, fstTenNums))          # Digits  
+          ^^ implode(replicate(fillSpaceCount, ' '))        # Whitespace
+          ^^ "\t:"      
           ^^ intToString(lineCount * 10 + charCount)        # Digit count
         );
 
