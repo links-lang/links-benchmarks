@@ -20,7 +20,7 @@ module BigNum {
   sig toString: (BigNum) -> String
   fun toString(bn) {
     var BigNumStr(n) = bn;
-    n
+    (n ^^ "")
   }
 }
 
@@ -116,9 +116,32 @@ var inputMatrixCount = 100;
 
 # Some functions for printing 
 fun join(sep, xs) { fold_left1(fun(x,y) { x ^^ sep ^^ y }, xs) }
-fun concat(xs) {
-  # Note: Empty string required to avoid addition of integer at client side
-  join("", xs)
+# Note: Empty string required to avoid addition of integer at client side
+fun concat(xs) { join("", xs) }
+
+sig printPidigits: ([BigNum]) ~> ()
+fun printPidigits(digits) {
+  fun printPidigits'(digits, charCount, lineCount) {
+    switch (digits) {
+      case [] -> {
+        var fillSpaceCount = 10 - charCount;
+        println(
+          concat(replicate(fillSpaceCount, " "))  ^^ "\t:"  # Whitespace for formatting
+          ^^ intToString(lineCount * 10 + charCount)        # Digit count
+        )
+      }
+      case (x :: xs) -> {
+        if (charCount == 10) {
+          println(BigNum.toString(x) ^^ "\t:" ^^ intToString((lineCount + 1)*10));
+          printPidigits'(xs, 0, lineCount + 1)
+        } else {
+          print(BigNum.toString(x));
+          printPidigits'(xs, charCount + 1, lineCount + 1)
+        }
+      }
+    }
+  }
+  printPidigits'(digits, 0, 0)
 }
 
 # Client stuff
@@ -135,14 +158,15 @@ fun mainPage(_) {
     };
 
     var resultBigNums= stream(unit, lfts) : [BigNum];
-    var resultOutput = concat(map(BigNum.toString, resultBigNums));
-
-    println(resultOutput)
-
+    printPidigits(resultBigNums)
   };
 
   page
-    <html><body><h1>Hi!</h1></body></html>
+    <html>
+      <body>
+        <h1>Open console for the output</h1>
+      </body>
+    </html>
 }
 
 fun main() {
