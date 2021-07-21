@@ -82,7 +82,7 @@ fun floorExtr(m, x) {
   (numerator </> denominator)
 }
 
-sig next: LFT -> BigNum
+sig next: (LFT) -> BigNum
 fun next(z) {
   floorExtr(z, BigNum.fromInt(3))
 }
