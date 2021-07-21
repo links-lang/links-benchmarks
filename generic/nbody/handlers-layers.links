@@ -200,7 +200,9 @@ fun body(bd) {
 
   fun advance() {
     # TODO so many accesses will be inefficient AF if I keep using
-    # Alists, but eh, demonstration purposes
+    # Alists, but eh, demonstration purposes (maybe just move the
+    # entire body at all times, because this *slightly* optimised code
+    # does it anyway)
     var mass = @!$ Mass;
     var pos  = @!> Pos;
     var vel  = @!> Vel;
