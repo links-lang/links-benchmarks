@@ -4,7 +4,7 @@
 #   [http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/spigot.pdf]
 
 module JSBigInt{
-  alien javascript "/js/BigInt.js" {
+  alien javascript "/ffi/BigInt.js" {
       # String represents a number here
       div: (String, String) -> String;
       add: (String, String) -> String;
@@ -107,13 +107,13 @@ fun stream(z, lftIndex, digitCount, n) {
   if (digitCount == n)
     []
   else {
-    var x = ( 
+    var x = (
       BigNum.fromInt(lftIndex),
       BigNum.fromInt(4)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(2),
       BigNum.fromInt(0),
       BigNum.fromInt(2)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(1)
     ): LFT;
-    var y = next(z); 
+    var y = next(z);
     if (safe(z, y))
       y :: stream(prod(z, y), lftIndex, digitCount + 1, n)
     else
@@ -121,9 +121,9 @@ fun stream(z, lftIndex, digitCount, n) {
   }
 }
 
-# Some functions for printing 
+# Some functions for printing
 fun join(sep, xs) { fold_left1(fun(x,y) { "" ^^ x ^^ sep ^^ y }, xs) }
-# Note: Empty string required to avoid addition of integer in JS 
+# Note: Empty string required to avoid addition of integer in JS
 fun concat(xs) { join("", xs) }
 
 sig printPidigits: ([BigNum]) ~> ()
@@ -140,9 +140,9 @@ fun printPidigits(digits) {
         var fillSpaceCount = 10 - charCount;
 
         println(
-          concat(map(BigNum.toString, fstTenNums))          # Digits  
+          concat(map(BigNum.toString, fstTenNums))          # Digits
           ^^ implode(replicate(fillSpaceCount, ' '))        # Whitespace
-          ^^ "\t:"      
+          ^^ "\t:"
           ^^ intToString(lineCount * 10 + charCount)        # Digit count
         );
 
@@ -174,7 +174,7 @@ fun mainPage(_) {
 
 fun main() {
   addRoute("/", mainPage);
-  addStaticRoute("/js", "js", [("js", "text/javascript")]);
+  addStaticRoute("/ffi", "ffi", [("js", "text/javascript")]);
   servePages()
 }
 
