@@ -1,0 +1,181 @@
+# Pi digit generator
+# Algorithm Source:
+#   Unbounded Spigot Algorithms for the Digits of Pi
+#   [http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/spigot.pdf]
+
+module JSBigInt{
+  alien javascript "/ffi/BigInt.js" {
+      # String represents a number here
+      div: (String, String) -> String;
+      add: (String, String) -> String;
+      mult: (String, String) -> String;
+  }
+}
+
+# Represent integer with an arbitrary precision
+typename BigNum = [|BigNumStr:String|];
+
+module BigNum {
+  # Construct BigNum with an Int
+  sig fromInt: (Int) -> BigNum
+  fun fromInt(n) { BigNumStr(intToString(n)) }
+
+  # Get String representation of BigNum
+  sig toString: (BigNum) -> String
+  fun toString(bn) {
+    var BigNumStr(n) = bn;
+    (n ^^ "")
+  }
+}
+
+# Represent 2x2 matrix
+typename LFT = (BigNum, BigNum, BigNum, BigNum);
+
+module LFT {
+  # Construct LFT from four integers
+  fun fromInts(a, b, c, d) {
+    (BigNum.fromInt(a), BigNum.fromInt(b), BigNum.fromInt(c), BigNum.fromInt(d)) : LFT
+  }
+}
+
+# Arithmetic operators on BigNum
+op x <+> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.add(x, y))
+}
+
+op x <*> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.mult(x, y))
+}
+
+op x </> y {
+  var BigNumStr(x) = x;
+  var BigNumStr(y) = y;
+  BigNumStr(JSBigInt.div(x, y))
+}
+
+# Set operator precedence
+infixl 3 <*>;
+infixl 3 </>;
+infixl 2 <+>;
+
+# Unit matrix
+var unit = LFT.fromInts(1,0,0,1);
+
+# Matrix multiplication
+sig comp: (LFT, LFT) -> LFT
+fun comp(m1: LFT, m2: LFT) {
+  var (q, r, s, t) = m1;
+  var (u, v, w, x) = m2;
+  (q<*>u <+> r<*>w, q<*>v <+> r<*>x,
+   s<*>u <+> t<*>w, s<*>v <+> t<*>x)
+}
+
+sig floorExtr: (LFT, BigNum) -> BigNum
+fun floorExtr(m, x) {
+  var (q, r, s, t) = m;
+  var numerator = (q <*> x <+> r);
+  var denominator = (s <*> x <+> t);
+  (numerator </> denominator)
+}
+
+sig next: (LFT) -> BigNum
+fun next(z) {
+  floorExtr(z, BigNum.fromInt(3))
+}
+
+sig prod: (LFT, BigNum) -> LFT
+fun prod(z, n) {
+  var m = (BigNum.fromInt(10), BigNum.fromInt(-10)<*>n,
+           BigNum.fromInt(0), BigNum.fromInt(1));
+  comp(m, z)
+}
+
+sig safe: (LFT, BigNum) -> Bool
+fun safe(z, n) {
+  n == floorExtr(z, BigNum.fromInt(4))
+}
+
+var cons = comp;
+var init = unit;
+
+sig stream: (LFT, Int, Int, Int) ~> [BigNum]
+fun stream(z, lftIndex, digitCount, n) {
+  if (digitCount == n)
+    []
+  else {
+    var x = (
+      BigNum.fromInt(lftIndex),
+      BigNum.fromInt(4)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(2),
+      BigNum.fromInt(0),
+      BigNum.fromInt(2)<*>BigNum.fromInt(lftIndex)<+>BigNum.fromInt(1)
+    ): LFT;
+    var y = next(z);
+    if (safe(z, y))
+      y :: stream(prod(z, y), lftIndex, digitCount + 1, n)
+    else
+      stream(comp(z, x), lftIndex + 1, digitCount, n)
+  }
+}
+
+# Some functions for printing
+fun join(sep, xs) { fold_left1(fun(x,y) { "" ^^ x ^^ sep ^^ y }, xs) }
+# Note: Empty string required to avoid addition of integer in JS
+fun concat(xs) { join("", xs) }
+
+sig printPidigits: ([BigNum]) ~> ()
+fun printPidigits(digits) {
+  fun printPidigits'(digits, lineCount) {
+    switch (digits) {
+      case [] -> ()
+      case xs -> {
+        # Take first 10 digits to print
+        var fstTenNums = take(10, digits);
+
+        # Calculate required number of spaces for formatting
+        var charCount = length(fstTenNums);
+        var fillSpaceCount = 10 - charCount;
+
+        println(
+          concat(map(BigNum.toString, fstTenNums))          # Digits
+          ^^ implode(replicate(fillSpaceCount, ' '))        # Whitespace
+          ^^ "\t:"
+          ^^ intToString(lineCount * 10 + charCount)        # Digit count
+        );
+
+        # Tail-recurse with the remaining digits
+        var tail = drop(10, digits);
+        printPidigits'(tail, lineCount + 1)
+      }
+    }
+  }
+  printPidigits'(digits, 0)
+}
+
+fun mainPage(_) {
+  # Input: Number of digits of pi requested
+  var n = 99;
+
+  var _ = spawnClient {
+    var resultBigNums= stream(unit, 1, 0, n) : [BigNum];
+    printPidigits(resultBigNums)
+  };
+
+  page
+    <html>
+      <body>
+        <h1>Open console for the output</h1>
+      </body>
+    </html>
+}
+
+fun main() {
+  addRoute("/", mainPage);
+  addStaticRoute("/ffi", "ffi", [("js", "text/javascript")]);
+  servePages()
+}
+
+main()
