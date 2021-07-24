@@ -21,6 +21,7 @@
 
 
 # Type aliases:
+
 typename Triple(a) = (a, a, a);
 
 typename Vector3 = Triple(Float);
@@ -61,7 +62,7 @@ fun norm(v) {
   sqrt(norm2(v))
 }
 
-# Physics:
+# Initialization of the solar system
 
 sig offset_momentum : (Float, State) ~> State
 fun offset_momentum(solar_mass, system) {
@@ -126,6 +127,8 @@ fun initial_state() {
   bodies
 }
 
+# Physics
+
 sig interact : (Float, Body, Body) -> (Body, Body)
 fun interact(dt, (pos=r1, vel=v1, mass=m1),
                  (pos=r2, vel=v2, mass=m2)) {
@@ -169,7 +172,6 @@ fun advance(dt, system) {
 
 sig energy : (State) ~> Float
 fun energy(bodies:[Body]) {
-  # TODO (maybe) this can be rewritten as a fold
   switch (bodies) {
     case [] -> 0.0
     case body::rest -> {
@@ -185,6 +187,8 @@ fun energy(bodies:[Body]) {
     }
   }
 }
+
+# Running the simulation
 
 fun loop(system, dt, i, n) {
   if (i < n) {

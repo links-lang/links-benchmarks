@@ -340,6 +340,8 @@ fun energy(ns) {
   }
 }
 
+# Running the simulation
+
 fun loop(n, dt, names) {
   if (n > 0) {
     advance(dt, names);
