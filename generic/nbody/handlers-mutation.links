@@ -97,9 +97,8 @@ fun assoc_keys(alst) {
 
 sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
                                , Put:(a, b) {}-> ()
-                               , Keys:() {}-> [a]
-                               , Dump:() {}-> Alist(a,b) |e}~> c)
-               {Ask{_},Put{_},Keys{_},Dump{_}|e}~> c
+                               , Keys:() {}-> [a] |e}~> c)
+               {Ask{_},Put{_},Keys{_}|e}~> c
 fun statemgr(state, f) {
   shallowhandle (f()) {
     case Return(v) -> v
@@ -112,8 +111,6 @@ fun statemgr(state, f) {
 
     case Keys(resume)      -> { var keys = assoc_keys(state);
                                 statemgr(state, fun() { resume(keys) }) }
-
-    case Dump(resume)      -> { statemgr(state, fun() { resume(state) })}
   }
 }
 
@@ -126,9 +123,6 @@ fun put(k, v) { do Put(k, v) }
 
 sig keys : () {Keys:() {}-> [a]|e}~> [a]
 fun keys() { do Keys }
-
-sig dump : () {Dump:() {}-> Alist(a,b)|e}~> Alist(a,b)
-fun dump() { do Dump }
 
 # DSL for later
 
