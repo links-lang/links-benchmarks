@@ -1,12 +1,22 @@
-############################################################################################
-# N-body simulation using Effects and Handlers: simulating mutation (optimized version)    #
-# =====================================================================================    #
-#                                                                                          #
-# TODO fill this; note that this file is almost identical to <handlers-muation.links> (<1>)#
-# but crucially the underlying internal state is handled differently (using records and    #
-# less dynamic dispatch here)                                                              #
-#                                                                                          #
-############################################################################################
+# ====================================================================================
+# N-body simulation using Effects and Handlers: simulating mutation, optimised version
+# ====================================================================================
+#
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system. See [simple.links].
+#
+# This is a slightly optimised version of [handlers-mutation.links] (1). It simulates
+# state using the Ask and Put operations. State is, in contrast to
+# [handlers-mutation.links]'s alists, stored as a record containing records. Differences
+# from the original version are marked by (1).
+#
+# State is managed separately and is transparent to the physics code.
+#
+# TODO do I put references here?
+#
+# Uses: records, variants, type aliases, FP arithmetic, shallow effect handlers, custom
+# state management
+
 
 # Type aliases:
 typename Triple(a) = (a, a, a);
@@ -22,7 +32,7 @@ typename Name = [| Sun
                  | Uranus
                  | Neptune |];
 
-# differences from <1> below
+# differences from (1) below
 
 var names = [ Sun, Jupiter, Saturn, Uranus, Neptune ];
 
@@ -71,7 +81,7 @@ fun norm(v) {
   sqrt(norm2(v))
 }
 
-# State: different from <1>
+# State: different from (1)
 
 sig access : (Name, State) ~> Body
 fun access(k, state) {
@@ -112,10 +122,9 @@ fun statemgr(state, f) {
   }
 }
 
-# The rest of the program is essentially the same as the original in
-# <1> (modulo changes to make the code compatible with the new
-# infrastructure). This also demonstrates that the underlying
-# representations are completely transparent to the physics code.
+# The rest of the program is essentially the same as the original in (1) (modulo changes
+# to make the code compatible with the new infrastructure). This also demonstrates that
+# the underlying representations are completely transparent to the physics code.
 
 sig ask : (a) {Ask:(a) {}-> b|e}~> b
 fun ask(k) { do Ask(k) }

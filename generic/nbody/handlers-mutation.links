@@ -1,10 +1,21 @@
-############################################################################################
-# N-body simulation using Effects and Handlers: simulating mutation                        #
-# =================================================================                        #
-# 											   #
-# TODO fill this part (reference <simple.links>)                                           #
-#                                                                                          #
-############################################################################################
+# =================================================================
+# N-body simulation using Effects and Handlers: simulating mutation
+# =================================================================
+#
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system. See [simple.links].
+#
+# This version is based on [simple.links], with a handlery spin: It simulates state by
+# using the Ask and Put operations. State is currently stored as an Alist - for a more
+# optimised version, see [handlers-mutation-opt.links].
+#
+# State is managed separately and is transparent to the physics code.
+#
+# TODO do I put references here?
+#
+# Uses: records (tuples), variants, alists, type aliases, FP arithmetic, shallow effect
+# handlers, custom state management
+
 
 # Type aliases:
 typename Triple(a) = (a, a, a);
@@ -325,9 +336,6 @@ fun energy(ns) {
   switch(ns) {
     case [] -> 0.0
     case n::rest -> {
-      # TODO these searches will take long - there could be some
-      # internal optimization (but this is all purposefully
-      # transparent to the physics code)
       var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
       var potential = fold_left(fun (acc, other) {
         var dr = (@!> n@.Pos) --- (@!> other@.Pos);

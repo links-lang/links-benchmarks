@@ -2,14 +2,18 @@
 # N-body simulation
 # =================
 #
-# A program that numerically simulates the evolution of the outer
-# planets of the solar system.
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system.
 #
 # This is a simple functional version of the algorithm.
 #
-# Based on:
+#
+# References:
+# -----------
+#
 # * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"
 #   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html]
+#
 # * and Troestler Christophe's implementation of the same problem in OCaml
 #   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html]
 #
