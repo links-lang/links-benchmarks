@@ -242,12 +242,9 @@ fun handle_spawn(rest) {
 }
 
 fun universe(n_iter, dt, bodies) {
-  # TODO maybe (probably!) the local state will happen before universe
-  # is given the bodies
-  var bodies = map(fun (f)() { local_state(f) }, bodies);
   var bodies = handle_spawn(bodies);
 
-  var dp = fold_left(fun (acc, ((mass=mass, vel=vel|_), _)) {
+  var dp : Vector3 = fold_left(fun (acc, ((mass=mass, vel=vel|_), _)) {
     acc --- (mass **. vel)
   }, zero3, bodies);
 
@@ -264,9 +261,9 @@ fun universe(n_iter, dt, bodies) {
     }
   }, (Nothing, []), bodies);
 
-  # correction will be applied to the sun
   var sun = switch(sun) {
     case Nothing -> error("Empty universe")
+      # correction dp will be applied to the sun
     case Just((_, resume)) -> fun () { resume(dp) }
   };
 
@@ -285,68 +282,67 @@ fun universe(n_iter, dt, bodies) {
 
 # Initialization of the solar system
 
-# sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
-#                                     Keys:() {}-> [Name],
-#                                     Put:(Name, Body) {}-> ()|_}~> ()
-# fun offset_sun_momentum(solar_mass) {
-#   var bodies = keys();
-#   var dp = fold_left(fun(acc, n) {
-#     acc +++ (@!$ n @. Mass **. @!> n @. Vel)
-#   }, zero3, bodies);
-#   var v = (-. 1.0 /. solar_mass) **. dp;
-#   Sun @. Vel @=< v
-# }
+fun init_body(bd) {
+  fun () {
+    local_state(fun() { body(bd) })
+  }
+}
 
-# sig init_system : () {Ask:(Name) {}-> Maybe(Body),
-#                       Keys:() {}-> [Name],
-#                       Put:(Name, Body) {}-> ()|_}~> ()
-# fun init_system() {
-#   var pi = 3.141592653589793;
-#   var solar_mass = 4.0 *. pi *. pi;
-#   var days_per_year = 365.24;
 
-#   Sun @=| ( mass = solar_mass
-#           , pos = zero3
-#           , vel = zero3 );
+fun init_system() {
+  var pi = 3.141592653589793;
+  var solar_mass = 4.0 *. pi *. pi;
+  var days_per_year = 365.24;
 
-#   Jupiter @=| ( mass =     9.54791938424326609e-4 *. solar_mass
-#               , pos  = (   4.84143144246472090e0
-#                        , -.1.16032004402742839e0
-#                        , -.1.03622044471123109e-1 )
-#               , vel  = days_per_year **.
-#                        (   1.66007664274403694e-3
-#                        ,   7.69901118419740425e-3
-#                        , -.6.90460016972063023e-5 ));
+  var bodies = [
+    # sun
+    ( mass = solar_mass
+           , pos = zero3
+           , vel = zero3 ),
 
-#   Saturn @=| ( mass =     2.85885980666130812e-4 *. solar_mass
-#              , pos  = (   8.34336671824457987e0
-#                       ,   4.12479856412430479e0
-#                       , -.4.03523417114321381e-1 )
-#              , vel  = days_per_year **.
-#                       ( -.2.76742510726862411e-3
-#                       ,   4.99852801234917238e-3
-#                       ,   2.30417297573763929e-5 ));
+    # jupiter
+    ( mass =     9.54791938424326609e-4 *. solar_mass
+           , pos  = (   4.84143144246472090e0
+                    , -.1.16032004402742839e0
+                    , -.1.03622044471123109e-1 )
+           , vel  = days_per_year **.
+                    (   1.66007664274403694e-3
+                    ,   7.69901118419740425e-3
+                    , -.6.90460016972063023e-5 )),
 
-#   Uranus @=| ( mass =     4.36624404335156298e-5 *. solar_mass
-#              , pos  = (   1.28943695621391310e1
-#                       , -.1.51111514016986312e1
-#                       , -.2.23307578892655734e-1 )
-#              , vel  = days_per_year **.
-#                       (   2.96460137564761618e-3
-#                       ,   2.37847173959480950e-3
-#                       , -.2.96589568540237556e-5 ));
+    # saturn
+    ( mass =     2.85885980666130812e-4 *. solar_mass
+           , pos  = (   8.34336671824457987e0
+                    ,   4.12479856412430479e0
+                    , -.4.03523417114321381e-1 )
+           , vel  = days_per_year **.
+                    ( -.2.76742510726862411e-3
+                    ,   4.99852801234917238e-3
+                    ,   2.30417297573763929e-5 )),
 
-#   Neptune @=| ( mass =     5.15138902046611451e-5 *. solar_mass
-#               , pos  = (   1.53796971148509165e1
-#                        , -.2.59193146099879641e1
-#                        ,   1.79258772950371181e-1 )
-#               , vel  = days_per_year **.
-#                        (   2.68067772490389322e-3
-#                        ,   1.62824170038242295e-3
-#                        , -.9.51592254519715870e-5 ));
+    # uranus
+    ( mass =     4.36624404335156298e-5 *. solar_mass
+           , pos  = (   1.28943695621391310e1
+                    , -.1.51111514016986312e1
+                    , -.2.23307578892655734e-1 )
+           , vel  = days_per_year **.
+                    (   2.96460137564761618e-3
+                    ,   2.37847173959480950e-3
+                    , -.2.96589568540237556e-5 )),
 
-#   offset_sun_momentum(solar_mass)
-# }
+    # neptune
+    ( mass =     5.15138902046611451e-5 *. solar_mass
+           , pos  = (   1.53796971148509165e1
+                    , -.2.59193146099879641e1
+                    ,   1.79258772950371181e-1 )
+           , vel  = days_per_year **.
+                    (   2.68067772490389322e-3
+                    ,   1.62824170038242295e-3
+                    , -.9.51592254519715870e-5 ))
+  ];
+
+  map(init_body, bodies)
+}
 
 
 ############ PROGRAM ENTRY ############
