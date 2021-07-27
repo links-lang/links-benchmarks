@@ -10,13 +10,13 @@ present in this repository. If a program needs some specific
 configuration options, e.g. enabling handlers, these can be set as
 follows:
 
-* For a single program (say "program.links"), create the file
-  "program.config" in the same directory that will contain the Links
+* For a single program (say `program.links`), create the file
+  `program.config` in the same directory that will contain the Links
   configuation to run that program.
 
 * For multiple programs in the same directory, you can also use a
-  default config: "_default.config" - this is the fallback if there
-  is no "program.config".
+  default config: `_default.config` - this is the fallback if there
+  is no `program.config`.
 
 * If none of these are present, Links will run with the default
   configuration.
