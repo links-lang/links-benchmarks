@@ -6,7 +6,24 @@ for p in $(find -P . -path ./_opam -prune -false -o -name "*.links"); do
   if [[ $? -eq 0 ]]; then
     printf " IGNORED\n"
   else
-    linx --set=typecheck_only=true $p
+    dirname=$(dirname "$p")
+    basename=$(basename "$p")
+    filename=${basename%.*}
+    echo $dirname
+    echo $filename
+    if [[ -f "$dirname/$filename.config" ]]; then
+      config="$dirname/$filename.config"
+    elif [[ -f "$dirname/_default.config" ]]; then
+      config="$dirname/_default.config"
+    else
+      config=""
+    fi
+    echo $config
+    if [[ -n $config ]]; then
+      linx --set=typecheck_only=true --set=config=$config $p
+    else
+      linx --set=typecheck_only=true $p
+    fi
     if [[ $? -eq 0 ]]; then
       printf " SUCCESS\n"
     else
