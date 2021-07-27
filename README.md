@@ -11,7 +11,7 @@ configuration options, e.g. enabling handlers, these can be set as
 follows:
 
 * For a single program (say "program.links"), create the file
-  "program.comfig" in the same directory that will contain the Links
+  "program.config" in the same directory that will contain the Links
   configuation to run that program.
 
 * For multiple programs in the same directory, you can also use a
