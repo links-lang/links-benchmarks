@@ -3,11 +3,11 @@
 # =================================================================
 #
 # A program that numerically simulates the evolution of the outer planets of the solar
-# system. See [simple.links].
+# system. See [generic/nbody.links].
 #
-# This version is based on [simple.links], with a handlery spin: It simulates state by
-# using the Ask and Put operations. State is currently stored as an Alist - for a more
-# optimised version, see [handlers-mutation-opt.links].
+# This version is based on [generic/nbody.links], with a handlery spin: It simulates state
+# by using the Ask and Put operations. State is currently stored as an Alist - for a more
+# optimised version, see [./nbody_opt.links].
 #
 # State is managed separately and is transparent to the physics code.
 #

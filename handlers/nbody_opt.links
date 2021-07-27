@@ -3,12 +3,11 @@
 # ====================================================================================
 #
 # A program that numerically simulates the evolution of the outer planets of the solar
-# system. See [simple.links].
+# system. See [generic/nbody.links].
 #
-# This is a slightly optimised version of [handlers-mutation.links] (1). It simulates
-# state using the Ask and Put operations. State is, in contrast to
-# [handlers-mutation.links]'s alists, stored as a record containing records. Differences
-# from the original version are marked by (1).
+# This is a slightly optimised version of [./nbody.links] (1). It simulates state using
+# the Ask and Put operations. State is, in contrast to [./nbody.links]'s alists, stored as
+# a record containing records. Differences from the original version are marked by (1).
 #
 # State is managed separately and is transparent to the physics code.
 #
