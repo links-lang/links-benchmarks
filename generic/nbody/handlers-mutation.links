@@ -20,6 +20,8 @@
 # * and Troestler Christophe's implementation of the same problem in OCaml
 #   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html]
 #
+# * Links examples: [links/examples/handlers/{shallow_state,deep_state,lambda}.links]
+#
 # Uses: records (tuples), variants, alists, type aliases, FP arithmetic, shallow effect
 # handlers, custom state management
 
