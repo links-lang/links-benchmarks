@@ -34,7 +34,7 @@ for p in $(find -P . -path ./_opam -prune -false -o -name "*.links"); do
     fi
     # Run Links, possibly with the config
     if [[ -n $config ]]; then
-      linx --set=typecheck_only=true --config=$config $p
+      linx --config=$config --set=typecheck_only=true  $p
     else
       linx --set=typecheck_only=true $p
     fi
