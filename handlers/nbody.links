@@ -1,0 +1,391 @@
+# =================================================================
+# N-body simulation using Effects and Handlers: simulating mutation
+# =================================================================
+#
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system. See [generic/nbody.links].
+#
+# This version is based on [generic/nbody.links], with a handlery spin: It simulates state
+# by using the Ask and Put operations. State is currently stored as an Alist - for a more
+# optimised version, see [./nbody_opt.links].
+#
+# State is managed separately and is transparent to the physics code.
+#
+# References:
+# -----------
+#
+# * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html]
+#
+# * and Troestler Christophe's implementation of the same problem in OCaml
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html]
+#
+# * Links examples: [links/examples/handlers/{shallow_state,deep_state,lambda}.links]
+#
+# Uses: records (tuples), variants, alists, type aliases, FP arithmetic, shallow effect
+# handlers, custom state management
+
+
+# Type aliases:
+typename Triple(a) = (a, a, a);
+typename Alist(a, b) = [(a, b)];
+
+typename Vector3 = Triple(Float);
+var zero3 = (0.0, 0.0, 0.0) : Vector3;
+typename Scalar = Float;
+
+typename Name = [| Sun
+                 | Jupiter
+                 | Saturn
+                 | Uranus
+                 | Neptune |];
+
+typename Body = ( pos  : Vector3
+                , vel  : Vector3
+                , mass : Scalar );
+
+typename State = Alist(Name, Body);
+
+
+# Helper functions:
+
+sig fst : ((a,b)) -> a
+fun fst((a,_)) { a }
+
+## Vectors:
+op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
+op (ux,uy,uz) --- (vx,vy,vz) { (ux -. vx, uy -. vy, uz -. vz ) }
+
+sig vector_sum : ([Vector3]) ~> Vector3
+fun vector_sum(lst) {
+  fold_left((+++), zero3, lst)
+}
+
+infix 5 **.;
+op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
+
+sig norm2 : (Vector3) -> Float
+fun norm2((x,y,z)) {
+  x *. x +. y *. y +. z *. z
+}
+
+sig norm : (Vector3) -> Float
+fun norm(v) {
+  sqrt(norm2(v))
+}
+
+## Alist:
+sig assoc : (a, Alist(a,b)) ~> Maybe(b)
+fun assoc(k, alst) {
+  switch (alst) {
+    case [] -> Nothing
+    case ((xk, xv)::rest) -> if (k == xk)
+                               { Just(xv) }
+                             else
+                               { assoc(k, rest) }
+  }
+}
+
+sig upd_assoc : (a, b, Alist(a,b)) ~> Alist(a,b)
+fun upd_assoc(k, v, alst) {
+  switch (alst) {
+    case [] -> [(k,v)]
+    case ((xk, xv)::rest) -> if (k == xk)
+                               { (k, v) :: rest }
+                             else
+                               { (xk, xv) :: upd_assoc(k, v, rest) }
+  }
+}
+
+sig assoc_keys : (Alist(a,b)) ~> [a]
+fun assoc_keys(alst) {
+  map(fst, alst)
+}
+
+# Handler stuff:
+
+sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
+                               , Put:(a, b) {}-> ()
+                               , Keys:() {}-> [a] |e}~> c)
+               {Ask{_},Put{_},Keys{_}|e}~> c
+fun statemgr(state, f) {
+  shallowhandle (f()) {
+    case Return(v) -> v
+
+    case Ask(k, resume)    -> { var v = assoc(k, state);
+                                statemgr(state, fun() { resume(v) }) }
+
+    case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
+                                statemgr(state', fun() { resume(()) }) }
+
+    case Keys(resume)      -> { var keys = assoc_keys(state);
+                                statemgr(state, fun() { resume(keys) }) }
+  }
+}
+
+
+sig ask : (a) {Ask:(a) {}-> b|e}~> b
+fun ask(k) { do Ask(k) }
+
+sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
+fun put(k, v) { do Put(k, v) }
+
+sig keys : () {Keys:() {}-> [a]|e}~> [a]
+fun keys() { do Keys }
+
+# DSL for later
+
+typename Property = [| Mass
+                     | Pos
+                     | Vel |];
+
+typename Projection = [| Proj:(Name, Property) |];
+
+typename Result = [| S':Scalar | V':Vector3 |];
+
+
+infix 7 @.;
+sig @. : (Name, Property) -> Projection
+op e @. p { Proj(e, p) }
+
+
+prefix 6 @!;
+sig @! : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Result
+op @! e {
+  var Proj(n, p) = e;
+  var b = ask(n);
+  switch (b) {
+    case Nothing -> error("Undefined symbol")
+    case Just(b) -> {
+      switch(p) {
+        case Mass -> S'(b.mass)
+        case Pos  -> V'(b.pos)
+        case Vel  -> V'(b.vel)
+      }
+    }
+  }
+}
+
+
+prefix 6 @!$;
+sig @!$ : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Scalar
+op @!$ e {
+  switch(@!e) {
+    case S'(v) -> v
+    case _ -> error("Invalid scalar projection.")
+  }
+}
+
+
+prefix 6 @!>;
+sig @!> : (Projection) {Ask:(Name) {}-> Maybe(Body)|e}~> Vector3
+op @!> e {
+  switch(@!e) {
+    case V'(v) -> v
+    case _ -> error("Invalid vector projection.")
+  }
+}
+
+infix 6 @=|;
+sig @=| : (a, b) {Put:(a,b) {}-> ()|e}~> ()
+op n @=| v { put(n, v) }
+
+infix 6 @=;
+sig @= : (Projection, Result) {Ask:(Name) {}-> Maybe(Body),
+                               Put:(Name, Body) {}-> ()|e}~> ()
+op e @= v {
+  var Proj(n, p) = e;
+  var b = switch (ask(n)) {
+    case Nothing -> error("Undefined symbol")
+    case Just(b) -> b
+  };
+  var b' = switch ((p, v)) {
+    case (Mass, S'(m)) -> (b with mass = m)
+    case (Pos, V'(v)) -> (b with pos = v)
+    case (Vel, V'(v)) -> (b with vel = v)
+  };
+  put(n, b')
+}
+
+infix 6 @=<;
+sig @=< : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=< v {
+  e @= V'(v)
+}
+
+
+infix 6 @=<+;
+sig @=<+ : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=<+ v {
+  var original = switch(@!e) {
+    case V'(v) -> v
+    case _ -> error("Cannot assign a scalar here.")
+  };
+  e @=< (original +++ v)
+}
+
+infix 6 @=<-;
+sig @=<- : (Projection, Vector3) {Ask:(Name) {}-> Maybe(Body),
+                                 Put:(Name, Body) {}-> ()|e}~> ()
+op e @=<- v {
+  var original = switch(@!e) {
+    case V'(v) -> v
+    case _ -> error("Cannot assign a scalar here.")
+  };
+  e @=< (original --- v)
+}
+
+
+# Initialization of the solar system
+
+sig offset_sun_momentum : (Scalar) {Ask:(Name) {}-> Maybe(Body),
+                                    Keys:() {}-> [Name],
+                                    Put:(Name, Body) {}-> ()|_}~> ()
+fun offset_sun_momentum(solar_mass) {
+  var bodies = keys();
+  var dp = fold_left(fun(acc, n) {
+    acc +++ (@!$ n @. Mass **. @!> n @. Vel)
+  }, zero3, bodies);
+  var v = (-. 1.0 /. solar_mass) **. dp;
+  Sun @. Vel @=< v
+}
+
+sig init_system : () {Ask:(Name) {}-> Maybe(Body),
+                      Keys:() {}-> [Name],
+                      Put:(Name, Body) {}-> ()|_}~> ()
+fun init_system() {
+  var pi = 3.141592653589793;
+  var solar_mass = 4.0 *. pi *. pi;
+  var days_per_year = 365.24;
+
+  Sun @=| ( mass = solar_mass
+          , pos = zero3
+          , vel = zero3 );
+
+  Jupiter @=| ( mass =     9.54791938424326609e-4 *. solar_mass
+              , pos  = (   4.84143144246472090e0
+                       , -.1.16032004402742839e0
+                       , -.1.03622044471123109e-1 )
+              , vel  = days_per_year **.
+	               (   1.66007664274403694e-3
+                       ,   7.69901118419740425e-3
+                       , -.6.90460016972063023e-5 ));
+
+  Saturn @=| ( mass =     2.85885980666130812e-4 *. solar_mass
+             , pos  = (   8.34336671824457987e0
+                      ,   4.12479856412430479e0
+                      , -.4.03523417114321381e-1 )
+             , vel  = days_per_year **.
+	              ( -.2.76742510726862411e-3
+                      ,   4.99852801234917238e-3
+                      ,   2.30417297573763929e-5 ));
+
+  Uranus @=| ( mass =     4.36624404335156298e-5 *. solar_mass
+             , pos  = (   1.28943695621391310e1
+                      , -.1.51111514016986312e1
+                      , -.2.23307578892655734e-1 )
+             , vel  = days_per_year **.
+	              (   2.96460137564761618e-3
+                      ,   2.37847173959480950e-3
+                      , -.2.96589568540237556e-5 ));
+
+  Neptune @=| ( mass =     5.15138902046611451e-5 *. solar_mass
+              , pos  = (   1.53796971148509165e1
+                       , -.2.59193146099879641e1
+                       ,   1.79258772950371181e-1 )
+              , vel  = days_per_year **.
+	               (   2.68067772490389322e-3
+                       ,   1.62824170038242295e-3
+                       , -.9.51592254519715870e-5 ));
+
+  offset_sun_momentum(solar_mass)
+}
+
+
+# Physics
+
+sig physical_state_mgr : (() ~%~> v) ~%~> v
+fun physical_state_mgr(f) { statemgr([], f) }
+
+sig pair_interact : (Scalar) -> (Name) -> (Name) ~%~> ()
+fun pair_interact(dt)(n1)(n2) {
+  var dr = (@!> n1 @. Pos) --- (@!> n2 @. Pos);
+  var d2 = norm2(dr);
+  var mag = dt /. (d2 *. sqrt(d2));
+
+  var fc1 = (@!$ n2 @. Mass) *. mag;
+  var fc2 = (@!$ n1 @. Mass) *. mag;
+
+  n1 @. Vel @=<- (fc1 **. dr);
+  n2 @. Vel @=<+ (fc2 **. dr)
+}
+
+sig advance : (Scalar, [Name]) ~%~> ()
+fun advance(dt, ns) {
+  switch (ns) {
+    case [] -> ()
+    case (n::rest) -> {
+      iter(pair_interact(dt)(n), rest);
+      n @. Pos @=<+ (dt **. (@!> n @. Vel));
+      advance(dt, rest)
+    }
+  }
+}
+
+sig energy : ([Name]) ~%~> Scalar
+fun energy(ns) {
+  switch(ns) {
+    case [] -> 0.0
+    case n::rest -> {
+      var kinetic = 0.5 *. (@!$ n @. Mass) *. norm2(@!> n @. Vel);
+      var potential = fold_left(fun (acc, other) {
+        var dr = (@!> n@.Pos) --- (@!> other@.Pos);
+        var d = norm(dr);
+        var pot = (@!$ n@.Mass) *. (@!$ other@.Mass) /. d;
+        acc -. pot
+      }, 0.0, rest);
+
+      kinetic +. potential +. energy(rest)
+    }
+  }
+}
+
+# Running the simulation
+
+fun loop(n, dt, names) {
+  if (n > 0) {
+    advance(dt, names);
+    loop(n - 1, dt, names)
+  } else { () }
+}
+
+fun simulation(n, dt) {
+  init_system();
+  var system = keys();
+
+  var e = energy(system);
+  println(floatToString(e));
+
+  loop(n, dt, system);
+
+  var e = energy(system);
+  println(floatToString(e))
+}
+
+typename Setup = [| Correctness | Performance |];
+
+sig run_sim : (Setup) ~%~> ()
+fun run_sim(setup) {
+  var n = switch(setup) {
+    case Correctness -> 1000
+    case Performance -> 50000000
+  };
+  var dt = 0.01;
+  physical_state_mgr(fun() { simulation(n, dt) })
+}
+
+fun main() {
+  run_sim(Correctness)
+}
