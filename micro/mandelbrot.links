@@ -1,0 +1,44 @@
+# Approximate the mean number of iterations across a section of the
+# mandelbrot set
+#
+# (based on the code used in the Links Mandlebrot demo)
+
+var bailout = 16.0;
+var max_iterations = 200;
+
+fun mandelbrot(x, y) {
+  var cr = y -. 0.5;
+  var ci = x;
+  var zi = 0.0;
+  var zr = 0.0;
+  var i = 0;
+  fun loop(zr, zi, i) {
+      var i = i + 1;
+      var temp = zr *. zi;
+      var zr2 = zr *. zr;
+      var zi2 = zi *. zi;
+      var zr = zr2 -. zi2 +. cr;
+      var zi = temp +. temp +. ci;
+      if (zi2 +. zr2 > bailout) i
+      else if (i > max_iterations) 0
+      else loop(zr, zi, i)
+  }
+  loop(zr, zi, i)
+}
+
+# mean number of iterations across a sample of n*n uniformly
+# distributed points in a square
+fun meanMandlebrot(n) {
+  fun sample(x, y, a, n) {
+    if (y >= n) {
+      intToFloat(a) /. intToFloat(n * n)
+    } else if(x >= n) {
+      sample(0, y+1, a, n)
+    } else {
+      var d = intToFloat(n);
+      sample(x+1, y, a + mandelbrot(intToFloat(x) /. d, intToFloat(y) /. d), n)
+    }
+  }
+
+  sample(0, 0, 0, n)
+}
