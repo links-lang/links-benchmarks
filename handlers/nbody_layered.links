@@ -245,17 +245,29 @@ fun handle_spawn(rest) {
 #                                    (Energy, [(mass:Scalar, pos:Vector3)], [((Scalar, Vector3)) {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
 fun collect_interaction_requests(bodies) {
   switch (bodies) {
-    case [] -> (0.0, [], [])
+    case [] -> (0.0, [])
     case b :: rest ->
       var (mass:Scalar, pos:Vector3, ke:Energy, res) = shallowhandle(b()) {
         case Return() -> error("Incompatible body-function.")
         case Interact(mass, pos, ke, res) -> (mass, pos, ke, res)
       };
-      var (e_total, pairs, rest) = collect_interaction_requests(rest);
+      var (e_total, rest) = collect_interaction_requests(rest);
       var e_total = e_total +. ke;
-      var pairs = (mass=mass, pos=pos) :: pairs;
-      (e_total, pairs, res :: rest)
+      var rest = ((mass=mass, pos=pos), res) :: rest;
+      (e_total, rest)
   }
+}
+
+sig pair_interaction : (Float, (mass:Scalar,pos:Vector3), (mass:Scalar,pos:Vector3)) -> Vector3
+fun pair_interaction(dt, (pos=r1, mass=m1),
+                         (pos=r2, mass=m2)) {
+  var dr = r1 --- r2;
+  var d2 = norm2(dr);
+
+  var k = m1 *. m2 /. (d2 *. sqrt(d2));
+
+  var f12 = -. k **. dr;
+  dt **. f12
 }
 
 fun universe(n_iter, dt, bodies) {
@@ -292,24 +304,35 @@ fun universe(n_iter, dt, bodies) {
     }
   }, (Nothing, []), bodies);
 
+  # correction dp will be applied to the sun
   var sun = switch(sun) {
     case Nothing -> error("Empty universe")
-    # correction dp will be applied to the sun
     case Just((_, resume)) -> fun () { resume(dp) }
   };
 
+  # other bodies get no correction
   var rest = map(fun((_, resume))() { resume(zero3) }, rest);
-
   var bodies = sun :: rest;
 
   var int_reqs = collect_interaction_requests(bodies);
-  # var energy_start = energy();
+  var (total_ke, bodies) = int_reqs;
 
+  var bodies = map(fun ((bd, bd_res)) { (bd, bd_res, zero3) }, bodies);
+  var bodies = fold_left(fun (rest, this) {
+    var (rest, this) = fold_left(fun (((rest, (this_body, this_resumption,_))), (other_body, other_resumption, other_dp)) {
+      var dp = pair_interaction(dt, this_body, other_body);
+      var this = (this_body, this_resumption, dp);
+      var other = (other_body, other_resumption, other_dp --- dp);
+      var rest = other :: rest;
+      (rest, this)
+    }, ([], this), rest);
+    this :: rest
+  }, [], bodies);
   # handle interactions until n_iter
 
   # energy again
 
-  (start=0.0:Scalar, end=0.0:Scalar)
+  (start=initial_energy, end=0.0:Scalar)
 }
 
 # Initialization of the solar system
