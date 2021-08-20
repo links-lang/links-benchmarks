@@ -261,11 +261,25 @@ fun collect_interaction_requests(bodies) {
 fun universe(n_iter, dt, bodies) {
   var bodies = handle_spawn(bodies);
 
-  var dp : Vector3 = fold_left(fun (acc, ((mass=mass, vel=vel|_), _)) {
-    acc --- (mass **. vel)
-  }, zero3, bodies);
+  var (dp:Vector3
+      ,initial_energy:Energy
+      ,_) = fold_left(fun ((dp, initial_energy, acc), (body, _)) {
+    var (mass=mass, vel=vel, pos=pos) = body;
+    var dp = dp --- (mass **. vel);
+
+    var ke = mass *. norm2(vel) /. 2.0;
+    var pe = fold_left(fun (pe, other) {
+      var dr = pos --- other.pos;
+      var d = norm(dr);
+      pe -. (mass *. other.mass /. d)
+    }, 0.0, acc);
+
+    var initial_energy = initial_energy +. ke +. pe;
+    (dp, initial_energy, body :: acc)
+  }, (zero3, 0.0, []), bodies);
 
   # find the most massive object - the star of the system
+  # TODO maybe join this with the above
   var (sun, rest) = fold_left(fun ((max, acc), (body, resumption)) {
     switch (max) {
       case Nothing -> (Just((body, resumption)), acc)
