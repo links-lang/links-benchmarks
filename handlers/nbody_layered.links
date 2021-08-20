@@ -207,8 +207,10 @@ fun body(bd) {
     var pos  = @!> Pos;
     var vel  = @!> Vel;
 
+    var ke = mass *. norm2(vel) /. 2;
+
     # TODO make this Δp: makes more sense to give the body a force than Δv
-    var (dt, delta_v) = do Interact((mass=mass, pos=pos, vel=vel)); # TODO give v or E?
+    var (dt, delta_p) = do Interact(mass, pos, ke);
     var vel = @!> Vel +++ delta_v;
 
     # the only advantage (as far as I can tell) is that the body will
