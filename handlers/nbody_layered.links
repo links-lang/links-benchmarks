@@ -45,9 +45,8 @@ fun assoc_keys(alst) {
 # Handler stuff:
 
 sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
-                               , Put:(a, b) {}-> ()
-                               , Dump:() {}-> Alist(a,b) |e}~> c)
-               {Ask{_},Put{_},Dump{_}|e}~> c
+                               , Put:(a, b) {}-> () |e}~> c)
+               {Ask{_},Put{_}|e}~> c
 fun statemgr(state, f) {
   shallowhandle (f()) {
     case Return(v) -> v
@@ -57,8 +56,6 @@ fun statemgr(state, f) {
 
     case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
                                 statemgr(state', fun() { resume(()) }) }
-
-    case Dump(resume)      -> { statemgr(state, fun() { resume(state) })}
   }
 }
 
@@ -68,10 +65,6 @@ fun ask(k) { do Ask(k) }
 
 sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
 fun put(k, v) { do Put(k, v) }
-
-# debug
-sig dump : () {Dump:() {}-> Alist(a,b)|e}~> Alist(a,b)
-fun dump() { do Dump }
 
 fun local_state(f) { statemgr([], f) }
 
@@ -225,9 +218,9 @@ fun body(bd) {
 
 # The Physical Universe:
 
-# sig handle_spawn : ([() {Spawn:(Body) {}-> Vector3|e}~> ()])
-#                    {Spawn{-}|e}~>
-#                    [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())]
+sig handle_spawn : ([() {Spawn:(Body) {}-> Vector3|e}~> ()])
+                   {Spawn{-}|e}~>
+                   [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())]
 fun handle_spawn(rest) {
   switch (rest) {
     case [] -> []
@@ -240,21 +233,21 @@ fun handle_spawn(rest) {
   }
 }
 
-# sig collect_interaction_requests : ([() {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
-#                                    ~e~>
-#                                    (Energy, [(mass:Scalar, pos:Vector3)], [((Scalar, Vector3)) {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+sig collect_interaction_requests : ([() {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+                                   {Interact{-}|e}~>
+                                   (Energy, [( Scalar
+                                             , Vector3
+                                             , ((Scalar, Vector3)) {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ())])
 fun collect_interaction_requests(bodies) {
   switch (bodies) {
     case [] -> (0.0, [])
     case b :: rest ->
-      var (mass:Scalar, pos:Vector3, ke:Energy, res) = shallowhandle(b()) {
+      var (ke, mpr) = shallowhandle(b()) {
         case Return() -> error("Incompatible body-function.")
-        case Interact(mass, pos, ke, res) -> (mass, pos, ke, res)
+        case Interact(mass, pos, ke, res) -> (ke, (mass, pos, res))
       };
-      var (e_total, rest) = collect_interaction_requests(rest);
-      var e_total = e_total +. ke;
-      var rest = ((mass=mass, pos=pos), res) :: rest;
-      (e_total, rest)
+      var (rest_ke, rest) = collect_interaction_requests(rest);
+      (ke +. rest_ke, mpr :: rest)
   }
 }
 
@@ -270,13 +263,20 @@ fun pair_interaction(dt, (pos=r1, mass=m1),
   dt **. f12
 }
 
-fun universe(n_iter, dt, bodies) {
-  var bodies = handle_spawn(bodies);
+sig n_compose : (Int, (a) ~> (a)) -> (a) ~> (a)
+fun n_compose(n, f)(x) {
+  if (n == 0)
+    x
+  else
+    n_compose(n - 1, f)(f(x))
+}
 
-  var (dp:Vector3
-      ,initial_energy:Energy
-      ,_) = fold_left(fun ((dp, initial_energy, acc), (body, _)) {
-    var (mass=mass, vel=vel, pos=pos) = body;
+fun universe(n_iter, dt, bodies) {
+  var bodies : [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())] = handle_spawn(bodies);
+
+  # initial correction (Δp on star), find star, initial energy
+  var (dp:Vector3, initial_energy:Energy, sun, _) = fold_left(fun ((dp, initial_energy, sun, seen), (body, body_res)) {
+    var (mass=mass, pos=pos, vel=vel) = body;
     var dp = dp --- (mass **. vel);
 
     var ke = mass *. norm2(vel) /. 2.0;
@@ -284,56 +284,109 @@ fun universe(n_iter, dt, bodies) {
       var dr = pos --- other.pos;
       var d = norm(dr);
       pe -. (mass *. other.mass /. d)
-    }, 0.0, acc);
+    }, 0.0, seen);
 
-    var initial_energy = initial_energy +. ke +. pe;
-    (dp, initial_energy, body :: acc)
-  }, (zero3, 0.0, []), bodies);
-
-  # find the most massive object - the star of the system
-  # TODO maybe join this with the above
-  var (sun, rest) = fold_left(fun ((max, acc), (body, resumption)) {
-    switch (max) {
-      case Nothing -> (Just((body, resumption)), acc)
-      case Just((sun, sun_res)) -> {
-        if (body.mass > sun.mass)
-          { (Just((body, resumption)), (sun, sun_res) :: acc) }
+    var sun = switch(sun) {
+      case Nothing -> Just((body, body_res))
+      case Just((other, other_res)) ->
+        if (body.mass > other.mass)
+          Just((body, body_res))
         else
-          { (max, (body, resumption) :: acc) }
-      }
-    }
-  }, (Nothing, []), bodies);
+          Just((other, other_res))
+    };
 
-  # correction dp will be applied to the sun
-  var sun = switch(sun) {
-    case Nothing -> error("Empty universe")
-    case Just((_, resume)) -> fun () { resume(dp) }
+    (dp, initial_energy +. ke +. pe, sun, body :: seen)
+  }, (zero3, 0.0, Nothing, []), bodies);
+
+  var sun = switch (sun) {
+    case Nothing -> error("Empty universe!")
+    case Just(sun) -> sun
   };
-
-  # other bodies get no correction
-  var rest = map(fun((_, resume))() { resume(zero3) }, rest);
-  var bodies = sun :: rest;
-
-  var int_reqs = collect_interaction_requests(bodies);
-  var (total_ke, bodies) = int_reqs;
-
-  var bodies = map(fun ((bd, bd_res)) { (bd, bd_res, zero3) }, bodies);
-  var bodies = fold_left(fun (rest, this) {
-    var (rest, this) = fold_left(fun (((rest, (this_body, this_resumption,_))), (other_body, other_resumption, other_dp)) {
-      var dp = pair_interaction(dt, this_body, other_body);
-      var this = (this_body, this_resumption, dp);
-      var other = (other_body, other_resumption, other_dp --- dp);
-      var rest = other :: rest;
-      (rest, this)
-    }, ([], this), rest);
-    this :: rest
-  }, [], bodies);
-  # handle interactions until n_iter
-
-  # energy again
-
-  (start=initial_energy, end=0.0:Scalar)
+  
+  (dp, initial_energy, sun)
 }
+
+# fun universe(n_iter, dt, bodies) {
+#   var bodies = handle_spawn(bodies);
+
+#   var (dp:Vector3
+#       ,initial_energy:Energy
+#       ,_) = fold_left(fun ((dp, initial_energy, acc), (body, _)) {
+#     var (mass=mass, vel=vel, pos=pos) = body;
+#     var dp = dp --- (mass **. vel);
+
+#     var ke = mass *. norm2(vel) /. 2.0;
+#     var pe = fold_left(fun (pe, other) {
+#       var dr = pos --- other.pos;
+#       var d = norm(dr);
+#       pe -. (mass *. other.mass /. d)
+#     }, 0.0, acc);
+
+#     var initial_energy = initial_energy +. ke +. pe;
+#     (dp, initial_energy, body :: acc)
+#   }, (zero3, 0.0, []), bodies);
+
+#   # find the most massive object - the star of the system
+#   # TODO maybe join this with the above
+#   var (sun, rest) = fold_left(fun ((max, acc), (body, resumption)) {
+#     switch (max) {
+#       case Nothing -> (Just((body, resumption)), acc)
+#       case Just((sun, sun_res)) -> {
+#         if (body.mass > sun.mass)
+#           { (Just((body, resumption)), (sun, sun_res) :: acc) }
+#         else
+#           { (max, (body, resumption) :: acc) }
+#       }
+#     }
+#   }, (Nothing, []), bodies);
+
+#   # correction dp will be applied to the sun
+#   var sun = switch(sun) {
+#     case Nothing -> error("Empty universe")
+#     case Just((_, resume)) -> fun () { resume(dp) }
+#   };
+
+#   # other bodies get no correction
+#   var rest = map(fun((_, resume))() { resume(zero3) }, rest);
+#   var bodies = sun :: rest;
+
+#   # interaction
+#   var bodies = n_compose(n_iter, fun (bodies) {
+#     var int_reqs = collect_interaction_requests(bodies);
+#     var (total_ke, bodies) = int_reqs;
+
+#     var bodies:[((mass:Scalar, pos:Vector3), () -%-> (), Vector3)] = map(fun ((bd, bd_res)) { (bd, bd_res, zero3) }, bodies);
+#     var bodies = fold_left(fun (rest, this) {
+#       var (rest, this) = fold_left(fun (((rest, (this_body, this_resumption,_))), (other_body, other_resumption, other_dp)) {
+#         var dp = pair_interaction(dt, this_body, other_body);
+#         var this = (this_body, this_resumption, dp);
+#         var other = (other_body, other_resumption, other_dp --- dp);
+#         var rest = other :: rest;
+#         (rest, this)
+#       }, ([], this), rest);
+#       this :: rest
+#     }, [], bodies);
+#     map(fun ((_, resume, dp))() { resume(dt, dp) }, bodies)
+#   })(bodies);
+
+#   # energy again
+#   var int_reqs = collect_interaction_requests(bodies);
+#   var (total_ke, bodies) = int_reqs;
+#   var (final_pe:Energy
+#       ,_) = fold_left(fun ((final_pe, acc), (body, _)) {
+#     var (mass=mass, pos=pos) = body;
+
+#     var pe = fold_left(fun (pe, other) {
+#       var dr = pos --- other.pos;
+#       var d = norm(dr);
+#       pe -. (mass *. other.mass /. d)
+#     }, 0.0, acc);
+
+#     (pe, body :: acc)
+#   }, (0.0, []), bodies);
+
+#   (start=initial_energy, end=final_energy)
+# }
 
 # Initialization of the solar system
 
