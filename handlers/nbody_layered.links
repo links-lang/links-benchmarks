@@ -272,7 +272,7 @@ fun n_compose(n, f)(x) {
 }
 
 fun universe(n_iter, dt, bodies) {
-  var bodies : [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())] = handle_spawn(bodies);
+  var bodies = handle_spawn(bodies);
 
   # initial correction (Δp on star), find star, initial energy
   var (dp:Vector3, initial_energy:Energy, sun, _) = fold_left(fun ((dp, initial_energy, sun, seen), (body, body_res)) {
@@ -300,10 +300,17 @@ fun universe(n_iter, dt, bodies) {
 
   var sun = switch (sun) {
     case Nothing -> error("Empty universe!")
-    case Just(sun) -> sun
+    case Just((sun)) -> sun
   };
-  
-  (dp, initial_energy, sun)
+  var bodies = map(fun (b) {
+    var (_, res) = b;
+    if (b == sun)
+      fun () { res(dp) }
+    else
+      fun () { res(zero3) }
+  }, bodies);
+
+  (dp, initial_energy, sun, bodies)
 }
 
 # fun universe(n_iter, dt, bodies) {
