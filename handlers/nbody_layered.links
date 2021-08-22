@@ -218,37 +218,23 @@ fun body(bd) {
 
 # The Physical Universe:
 
-sig handle_spawn : ([() {Spawn:(Body) {}-> Vector3|e}~> ()])
-                   {Spawn{-}|e}~>
-                   [(Body, (Vector3) {Spawn:(Body) {}-> Vector3|e}~> ())]
-fun handle_spawn(rest) {
-  switch (rest) {
-    case [] -> []
-    case b :: rest ->
-      var (bd, resume) = shallowhandle(b()) {
-        case Return() -> error("Incompatible body-function.")
-        case Spawn(bd, resume) -> (bd, resume)
-      };
-      (bd, resume) :: handle_spawn(rest)
-  }
+fun handle_spawn(bodies) {
+  map(fun (b) {
+    shallowhandle(b()) {
+      case Return() -> error("Incompatible body-function.")
+      case Spawn(bd, res) -> (bd, res)
+    }
+  }, bodies)
 }
 
-sig collect_interaction_requests : ([() {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
-                                   {Interact{-}|e}~>
-                                   (Energy, [( Scalar
-                                             , Vector3
-                                             , ((Scalar, Vector3)) {Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ())])
 fun collect_interaction_requests(bodies) {
-  switch (bodies) {
-    case [] -> (0.0, [])
-    case b :: rest ->
-      var (ke, mpr) = shallowhandle(b()) {
-        case Return() -> error("Incompatible body-function.")
-        case Interact(mass, pos, ke, res) -> (ke, (mass, pos, res))
-      };
-      var (rest_ke, rest) = collect_interaction_requests(rest);
-      (ke +. rest_ke, mpr :: rest)
-  }
+  fold_left(fun ((ke, acc), b) {
+    var (e, x) = shallowhandle(b()) {
+      case Return() -> error("Incompatible body-function.")
+      case Interact(mass, pos, ke, res) -> (ke, (mass, pos, res))
+    };
+    (ke +. e, x :: acc)
+  }, (0.0, []), bodies)
 }
 
 sig pair_interaction : (Float, (mass:Scalar,pos:Vector3), (mass:Scalar,pos:Vector3)) -> Vector3
