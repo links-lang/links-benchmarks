@@ -249,12 +249,12 @@ fun pair_interaction(dt, (pos=r1, mass=m1),
   dt **. f12
 }
 
-sig n_compose : (Int, (a) ~> (a)) -> (a) ~> (a)
-fun n_compose(n, f)(x) {
+sig n_compose : (Int, (a) ~> (a), a) ~> (a)
+fun n_compose(n, f, x) {
   if (n == 0)
     x
   else
-    n_compose(n - 1, f)(f(x))
+    n_compose(n - 1, f, f(x))
 }
 
 fun universe(n_iter, dt, bodies) {
