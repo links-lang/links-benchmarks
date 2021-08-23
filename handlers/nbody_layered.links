@@ -269,7 +269,7 @@ fun n_compose(n, f, x) {
 
 sig initial_correction : ([() {Spawn:(Body) -> Vector3
                               ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
-                         {Spawn{-}|e}~>
+                         {Spawn{-},Interact{-}|e}~>
                          [() {Spawn:(Body) -> Vector3
                              ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()]
 fun initial_correction(bodies) {
@@ -303,27 +303,32 @@ fun initial_correction(bodies) {
   sun :: others
 }
 
+
+sig energy_of_bodies : ([() {Spawn:(Body) -> Vector3
+                            ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+                       {Interact{-},Spawn{-}|e}~> Energy
+fun energy_of_bodies(bodies) {
+  var (energy, reqs) = collect_interaction_requests(bodies);
+  var (energy:Energy,_) = fold_left(fun ((energy, rest), (mass, pos,_)) {
+    var pe = fold_left(fun (pe, other) {
+      var dr = pos --- other.pos;
+      var d = norm(dr);
+      pe -. (mass *. other.mass /. d)
+    }, 0.0, rest);
+    (energy +. pe, (mass=mass, pos=pos) :: rest)
+  }, (energy, []), reqs);
+  energy
+}
+
 sig universe : (Int, Scalar, [() {Spawn:(Body) -> Vector3
                                  ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
                {Spawn{-},Interact{-}|e}~>
                (initial_energy:Energy, final_energy:Energy)
 fun universe(n_iter, dt, bodies) {
-  # initial stuff
   var bodies = initial_correction(bodies);
 
   # initial energy calculated after correction
-  var (initial_energy, reqs) = collect_interaction_requests(bodies);
-  var (initial_energy:Energy,_) = fold_left(fun ((initial_energy, rest), body) {
-    var (mass, pos,_) = body;
-    var pe = fold_left(fun (pe, other) {
-      var (other_mass, other_pos, _) = other;
-      var dr = pos --- other_pos;
-      var d = norm(dr);
-      pe -. (mass *. other_mass /. d)
-    }, 0.0, rest);
-    (initial_energy +. pe, body :: rest)
-  }, (initial_energy, []), reqs);
-
+  var initial_energy = energy_of_bodies(bodies);
 
   # simulate
   var bodies = n_compose(n_iter, fun (bodies) {
@@ -342,16 +347,8 @@ fun universe(n_iter, dt, bodies) {
     map(fun ((_,_, res, dp))() { res((dt, dp)) }, inters)
   }, bodies);
 
-  var (final_energy, reqs) = collect_interaction_requests(bodies);
-  var (final_energy:Energy,_) = fold_left(fun ((final_energy, rest), (mass, pos,_)) {
-    var pe = fold_left(fun (pe, other) {
-      var dr = pos --- other.pos;
-      var d = norm(dr);
-      pe -. (mass *. other.mass /. d)
-    }, 0.0, rest);
-    (final_energy +. pe, (mass=mass, pos=pos) :: rest)
-  }, (final_energy, []), reqs);
-
+  # final energy after the simulation
+  var final_energy = energy_of_bodies(bodies);
   (initial_energy=initial_energy, final_energy=final_energy)
 }
 
