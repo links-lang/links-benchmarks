@@ -1,10 +1,34 @@
-############################################################################################
-# N-body simulation using Effects and Handlers: layered abstraction                        #
-# =================================================================                        #
-#                                                                                          #
-# TODO fill this part (reference <simple.links>)                                           #
-#                                                                                          #
-############################################################################################
+# =================================================================
+# N-body simulation using Effects and Handlers: layered abstraction
+# =================================================================
+#
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system. See [generic/nbody.links], [handlers/nbody.links] and
+# [handlers/nbody_opt.links].
+#
+# This is a more handler heavy version, using effects and their handlers to implement
+# both state and concurrency.
+#
+# The Bodies (sun and planets) each have their own state and handle their own evolution,
+# while interacting with the Universe - however they know nothing about the other objects
+# in existence. The Universe acts as the environment that provides mutual interactions
+# for all the bodies.
+#
+# The Bodies could be seen as threads/processes, while the Universe is the kernel.
+#
+# References:
+# -----------
+#
+# * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html]
+#
+# * and Troestler Christophe's implementation of the same problem in OCaml
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html]
+#
+# * Links examples: [links/examples/handlers/{shallow_state,deep_state,lambda}.links]
+#
+# Uses: effect handlers! - implementing state and concurrency; FP arithmetic, DSL, alists, type aliases
+
 
 # Type aliases:
 typename Triple(a) = (a, a, a);
