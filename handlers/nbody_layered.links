@@ -42,8 +42,6 @@ fun assoc_keys(alst) {
   map(fst, alst)
 }
 
-# Handler stuff:
-
 sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
                                , Put:(a, b) {}-> () |e}~> c)
                {Ask{_},Put{_}|e}~> c
@@ -333,6 +331,7 @@ fun universe(n_iter, dt, bodies) {
   # simulate
   var bodies = n_compose(n_iter, fun (bodies) {
     var (_, reqs) = collect_interaction_requests(bodies);
+
     var inters = fold_left(fun (inters, (mass, pos, res)) {
       var (this_dp, inters) = fold_left(fun ((this_dp, inters), (other_mass, other_pos, other_res, other_dp)) {
         var dp = pair_interaction(dt, (mass=mass, pos=pos),
@@ -344,6 +343,7 @@ fun universe(n_iter, dt, bodies) {
       }, (zero3, []), inters);
       (mass, pos, res, this_dp) :: inters
     }, [], reqs);
+
     map(fun ((_,_, res, dp))() { res((dt, dp)) }, inters)
   }, bodies);
 
