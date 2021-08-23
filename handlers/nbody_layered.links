@@ -210,8 +210,6 @@ fun body(bd) {
     var pos  = @!> Pos;
     var vel  = @!> Vel;
 
-    # println("Body (mass=" ^^ floatToString(mass) ^^ ")\n  " ^^ vector3ToString(pos) ^^ "\n  " ^^ vector3ToString(vel));
-
     var ke = mass *. norm2(vel) /. 2.0;
 
     var (dt, delta_p) = do Interact(mass, pos, ke);
@@ -320,7 +318,6 @@ fun universe(n_iter, dt, bodies) {
 
   # simulate
   var bodies = n_compose(n_iter, fun (bodies) {
-    # println("");
     var (_, reqs) = collect_interaction_requests(bodies);
     var inters = fold_left(fun (inters, (mass, pos, res)) {
       var (this_dp, inters) = fold_left(fun ((this_dp, inters), (other_mass, other_pos, other_res, other_dp)) {
