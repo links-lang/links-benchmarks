@@ -300,19 +300,18 @@ fun universe(n_iter, dt, bodies) {
   var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
   var bodies = sun :: others;
 
-  var reqs = collect_interaction_requests(bodies);
+  var (final_energy, reqs) = collect_interaction_requests(bodies);
 
-  # var (final_energy:Energy,_) = fold_left(fun ((final_energy, rest), (ke, (mass, pos, _))) {
-  #   var pe = fold_left(fun (pe, other) {
-  #     var dr = pos --- other.pos;
-  #     var d = norm(dr);
-  #     pe -. (mass *. other.mass /. d)
-  #   }, 0.0, rest);
-  #   (final_energy +. ke +. pe, (mass=mass, pos=pos) :: rest)
-  # }, (0.0, []), reqs);
+  var (final_energy:Energy,_) = fold_left(fun ((final_energy, rest), (mass, pos,_)) {
+    var pe = fold_left(fun (pe, other) {
+      var dr = pos --- other.pos;
+      var d = norm(dr);
+      pe -. (mass *. other.mass /. d)
+    }, 0.0, rest);
+    (final_energy +. pe, (mass=mass, pos=pos) :: rest)
+  }, (0.0, []), reqs);
 
-
-  (reqs)
+  (initial_energy=initial_energy, final_energy=final_energy)
 }
 
 fun init_body(bd) {
