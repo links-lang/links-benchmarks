@@ -100,6 +100,14 @@ fun norm(v) {
   sqrt(norm2(v))
 }
 
+sig vector3ToString : (Vector3) -> String
+fun vector3ToString((x,y,z)) {
+  "(" ^^ floatToString(x) ^^
+  "," ^^ floatToString(y) ^^
+  "," ^^ floatToString(z) ^^
+  ")"
+}
+
 # Physical state: DSL
 
 typename Property = [| Mass
@@ -202,6 +210,8 @@ fun body(bd) {
     var pos  = @!> Pos;
     var vel  = @!> Vel;
 
+    println("Body (mass=" ^^ floatToString(mass) ^^ ")\n  " ^^ vector3ToString(pos) ^^ "\n  " ^^ vector3ToString(vel));
+
     var ke = mass *. norm2(vel) /. 2.0;
 
     var (dt, delta_p) = do Interact(mass, pos, ke);
@@ -259,6 +269,10 @@ fun n_compose(n, f, x) {
     n_compose(n - 1, f, f(x))
 }
 
+sig universe : (Int, Scalar, [() {Spawn:(Body) -> Vector3
+                                 ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+               {Spawn{-},Interact{-}|e}~>
+               (initial_energy:Energy, final_energy:Energy)
 fun universe(n_iter, dt, bodies) {
   # initial stuff
   var bodies = handle_spawn(bodies);
@@ -266,17 +280,6 @@ fun universe(n_iter, dt, bodies) {
   var dp:Vector3 = fold_left(fun (dp, (body,_)) {
     dp --- (body.mass **. body.vel)
   }, zero3, bodies);
-
-  var (initial_energy:Energy,_) = fold_left(fun ((initial_energy, rest), (body,_)) {
-    var (mass=mass, pos=pos, vel=vel) = body;
-    var ke = mass *. norm2(vel) /. 2.0;
-    var pe = fold_left(fun (pe, other) {
-      var dr = pos --- other.pos;
-      var d = norm(dr);
-      pe -. (mass *. other.mass /. d)
-    }, 0.0, rest);
-    (initial_energy +. ke +. pe, body :: rest)
-  }, (0.0, []), bodies);
 
   var (sun, others) = fold_left(fun ((sun, others), (body,body_res)) {
     switch (sun) {
@@ -301,8 +304,23 @@ fun universe(n_iter, dt, bodies) {
   var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
   var bodies = sun :: others;
 
+  # initial energy calculated after correction
+  var (initial_energy, reqs) = collect_interaction_requests(bodies);
+  var (initial_energy:Energy,_) = fold_left(fun ((initial_energy, rest), body) {
+    var (mass, pos,_) = body;
+    var pe = fold_left(fun (pe, other) {
+      var (other_mass, other_pos, _) = other;
+      var dr = pos --- other_pos;
+      var d = norm(dr);
+      pe -. (mass *. other_mass /. d)
+    }, 0.0, rest);
+    (initial_energy +. pe, body :: rest)
+  }, (initial_energy, []), reqs);
+
+
   # simulate
   var bodies = n_compose(n_iter, fun (bodies) {
+    println("");
     var (_, reqs) = collect_interaction_requests(bodies);
     var inters = fold_left(fun (inters, (mass, pos, res)) {
       var (this_dp, inters) = fold_left(fun ((this_dp, inters), (other_mass, other_pos, other_res, other_dp)) {
@@ -326,7 +344,7 @@ fun universe(n_iter, dt, bodies) {
       pe -. (mass *. other.mass /. d)
     }, 0.0, rest);
     (final_energy +. pe, (mass=mass, pos=pos) :: rest)
-  }, (0.0, []), reqs);
+  }, (final_energy, []), reqs);
 
   (initial_energy=initial_energy, final_energy=final_energy)
 }
