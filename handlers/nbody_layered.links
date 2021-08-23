@@ -267,12 +267,12 @@ fun n_compose(n, f, x) {
     n_compose(n - 1, f, f(x))
 }
 
-sig universe : (Int, Scalar, [() {Spawn:(Body) -> Vector3
-                                 ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
-               {Spawn{-},Interact{-}|e}~>
-               (initial_energy:Energy, final_energy:Energy)
-fun universe(n_iter, dt, bodies) {
-  # initial stuff
+sig initial_correction : ([() {Spawn:(Body) -> Vector3
+                              ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+                         {Spawn{-}|e}~>
+                         [() {Spawn:(Body) -> Vector3
+                             ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()]
+fun initial_correction(bodies) {
   var bodies = handle_spawn(bodies);
 
   var dp:Vector3 = fold_left(fun (dp, (body,_)) {
@@ -300,7 +300,16 @@ fun universe(n_iter, dt, bodies) {
     case (_,sun_res) -> fun () { sun_res(dp) }
   };
   var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
-  var bodies = sun :: others;
+  sun :: others
+}
+
+sig universe : (Int, Scalar, [() {Spawn:(Body) -> Vector3
+                                 ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+               {Spawn{-},Interact{-}|e}~>
+               (initial_energy:Energy, final_energy:Energy)
+fun universe(n_iter, dt, bodies) {
+  # initial stuff
+  var bodies = initial_correction(bodies);
 
   # initial energy calculated after correction
   var (initial_energy, reqs) = collect_interaction_requests(bodies);
