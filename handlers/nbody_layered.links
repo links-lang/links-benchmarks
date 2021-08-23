@@ -222,7 +222,7 @@ fun handle_spawn(bodies) {
   map(fun (b) {
     shallowhandle(b()) {
       case Return() -> error("Incompatible body-function.")
-      case Spawn(bd, res) -> (bd, res)
+      case Spawn(bd:Body, res) -> (bd, res)
     }
   }, bodies)
 }
@@ -231,7 +231,7 @@ fun collect_interaction_requests(bodies) {
   fold_left(fun ((ke, acc), b) {
     var (e, x) = shallowhandle(b()) {
       case Return() -> error("Incompatible body-function.")
-      case Interact(mass, pos, ke, res) -> (ke, (mass, pos, res))
+      case Interact(mass:Scalar, pos:Vector3, ke:Energy, res) -> (ke, (mass, pos, res))
     };
     (ke +. e, x :: acc)
   }, (0.0, []), bodies)
@@ -260,43 +260,57 @@ fun n_compose(n, f, x) {
 fun universe(n_iter, dt, bodies) {
   var bodies = handle_spawn(bodies);
 
-  # initial correction (Δp on star), find star, initial energy
-  var (dp:Vector3, initial_energy:Energy, sun, _) = fold_left(fun ((dp, initial_energy, sun, seen), (body, body_res)) {
-    var (mass=mass, pos=pos, vel=vel) = body;
-    var dp = dp --- (mass **. vel);
+  var dp:Vector3 = fold_left(fun (dp, (body,_)) {
+    dp --- (body.mass **. body.vel)
+  }, zero3, bodies);
 
+  var (initial_energy:Energy,_) = fold_left(fun ((initial_energy, rest), (body,_)) {
+    var (mass=mass, pos=pos, vel=vel) = body;
     var ke = mass *. norm2(vel) /. 2.0;
     var pe = fold_left(fun (pe, other) {
       var dr = pos --- other.pos;
       var d = norm(dr);
       pe -. (mass *. other.mass /. d)
-    }, 0.0, seen);
+    }, 0.0, rest);
+    (initial_energy +. ke +. pe, body :: rest)
+  }, (0.0, []), bodies);
 
-    var sun = switch(sun) {
-      case Nothing -> Just((body, body_res))
-      case Just((other, other_res)) ->
-        if (body.mass > other.mass)
-          Just((body, body_res))
+  var (sun, others) = fold_left(fun ((sun, others), (body,body_res)) {
+    switch (sun) {
+      case Nothing -> (Just((body, body_res)), others)
+      case Just((previous, previous_res)) ->
+        if (body.mass > previous.mass)
+          (Just((body, body_res)), (previous, previous_res) :: others)
         else
-          Just((other, other_res))
-    };
+          (Just((previous, previous_res)), (body, body_res) :: others)
+    }
+  }, (Nothing, []), bodies);
 
-    (dp, initial_energy +. ke +. pe, sun, body :: seen)
-  }, (zero3, 0.0, Nothing, []), bodies);
-
-  var sun = switch (sun) {
-    case Nothing -> error("Empty universe!")
-    case Just((sun)) -> sun
+  var sun = switch(sun) {
+    case Nothing -> error("Empty system!")
+    case Just(x) -> x
   };
-  var bodies = map(fun (b) {
-    var (_, res) = b;
-    if (b == sun)
-      fun () { res(dp) }
-    else
-      fun () { res(zero3) }
-  }, bodies);
 
-  (dp, initial_energy, sun, bodies)
+  # apply corrections
+  var sun = switch(sun) {
+    case (_,sun_res) -> fun () { sun_res(dp) }
+  };
+  var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
+  var bodies = sun :: others;
+
+  var reqs = collect_interaction_requests(bodies);
+
+  # var (final_energy:Energy,_) = fold_left(fun ((final_energy, rest), (ke, (mass, pos, _))) {
+  #   var pe = fold_left(fun (pe, other) {
+  #     var dr = pos --- other.pos;
+  #     var d = norm(dr);
+  #     pe -. (mass *. other.mass /. d)
+  #   }, 0.0, rest);
+  #   (final_energy +. ke +. pe, (mass=mass, pos=pos) :: rest)
+  # }, (0.0, []), reqs);
+
+
+  (reqs)
 }
 
 # fun universe(n_iter, dt, bodies) {
