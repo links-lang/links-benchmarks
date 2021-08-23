@@ -396,25 +396,24 @@ fun init_system() {
 
 ############ PROGRAM ENTRY ############
 
-# fun simulation(n, dt) {
-#   init_system()
-# }
+fun simulation(n, dt) {
+  var (initial_energy=ie, final_energy=fe) = universe(n, dt, init_system());
+  println(floatToString(ie));
+  println(floatToString(fe))
+}
 
-# typename Setup = [| Correctness | Performance |];
+typename Configuration = [| Correctness | Performance |];
 
-# sig run_sim : (Setup) ~%~> ()
-# fun run_sim(setup) {
-#   var n = switch(setup) {
-#     case Correctness -> 1000
-#     case Performance -> 50000000
-#   };
-#   var dt = 0.01;
-#   # TODO run simulation
-#   ()
-# }
+sig run_sim : (Configuration) ~%~> ()
+fun run_sim(config) {
+  var n = switch(config) {
+    case Correctness -> 1000
+    case Performance -> 50000000
+  };
+  var dt = 0.01;
+  simulation(n, dt)
+}
 
-# fun main() {
-#   run_sim(Correctness)
-# }
-
-
+fun main() {
+  run_sim(Correctness)
+}
