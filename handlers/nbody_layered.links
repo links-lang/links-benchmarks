@@ -223,6 +223,7 @@ fun handle_spawn(bodies) {
     shallowhandle(b()) {
       case Return() -> error("Incompatible body-function.")
       case Spawn(bd:Body, res) -> (bd, res)
+      case Interact(_,_,_,_) -> error("Incompatible body-function.")
     }
   }, bodies)
 }
@@ -231,6 +232,7 @@ fun collect_interaction_requests(bodies) {
   fold_left(fun ((ke, acc), b) {
     var (e, x) = shallowhandle(b()) {
       case Return() -> error("Incompatible body-function.")
+      case Spawn(_,_) -> error("Incompatible body-function.")
       case Interact(mass:Scalar, pos:Vector3, ke:Energy, res) -> (ke, (mass, pos, res))
     };
     (ke +. e, x :: acc)
