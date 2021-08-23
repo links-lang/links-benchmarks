@@ -260,6 +260,7 @@ fun n_compose(n, f, x) {
 }
 
 fun universe(n_iter, dt, bodies) {
+  # initial stuff
   var bodies = handle_spawn(bodies);
 
   var dp:Vector3 = fold_left(fun (dp, (body,_)) {
@@ -300,8 +301,24 @@ fun universe(n_iter, dt, bodies) {
   var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
   var bodies = sun :: others;
 
-  var (final_energy, reqs) = collect_interaction_requests(bodies);
+  # simulate
+  # TODO here
+  n_compose(n_iter, fun (bodies) {
+    var (_, reqs) = collect_interaction_requests(bodies);
+    var inters = fold_left(fun (acc, (mass, pos, res)) {
+      var (this_dp:Vector3, rest) = fold_left(fun ((this_dp, rest), other) {
+        var (other_mass, other_pos:Vector3, other_dp:Vector3, other_res) = other;
+        var dp = pair_interaction(dt, (mass=mass, pos=pos),
+                                      (mass=other_mass, pos=other_pos));
+        var other = (other_mass, other_pos, other_dp --- dp, other_res);
+        (this_dp +++ dp, other)
+      }, (zero3, []), acc);
+      (mass, pos, this_dp, res) :: rest
+    }, [], reqs);
+    map(fun ((_,_, dp, res))() { res(dp) }, inters)
+  }, bodies);
 
+  var (final_energy, reqs) = collect_interaction_requests(bodies);
   var (final_energy:Energy,_) = fold_left(fun ((final_energy, rest), (mass, pos,_)) {
     var pe = fold_left(fun (pe, other) {
       var dr = pos --- other.pos;
