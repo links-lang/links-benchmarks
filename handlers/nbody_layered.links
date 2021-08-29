@@ -1,0 +1,463 @@
+# =================================================================
+# N-body simulation using Effects and Handlers: layered abstraction
+# =================================================================
+#
+# A program that numerically simulates the evolution of the outer planets of the solar
+# system. See [generic/nbody.links], [handlers/nbody.links] and
+# [handlers/nbody_opt.links].
+#
+# This is a more handler heavy version, using effects and their handlers to implement
+# both state and concurrency.
+#
+# The Bodies (sun and planets) each have their own state and handle their own evolution,
+# while interacting with the Universe - however they know nothing about the other objects
+# in existence. The Universe acts as the environment that provides mutual interactions
+# for all the bodies.
+#
+# The Bodies could be seen as threads/processes, while the Universe is the kernel.
+#
+# References:
+# -----------
+#
+# * Mark C. Lewis's (with modifications from Chad Whipkey) "n-body Java #2 program"
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-java-2.html]
+#
+# * and Troestler Christophe's implementation of the same problem in OCaml
+#   [https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-ocaml-1.html]
+#
+# * Links examples: [links/examples/handlers/{shallow_state,deep_state,lambda}.links]
+#
+# Uses: effect handlers! - implementing state and concurrency; FP arithmetic, DSL, alists, type aliases
+
+
+# Type aliases:
+typename Triple(a) = (a, a, a);
+typename Alist(a, b) = [(a, b)];
+
+sig fst : ((a,b)) -> a
+fun fst((x,_)) { x }
+
+############ STATE ############
+
+sig assoc : (a, Alist(a,b)) ~> Maybe(b)
+fun assoc(k, alst) {
+  switch (alst) {
+    case [] -> Nothing
+    case ((xk, xv)::rest) -> if (k == xk)
+                               { Just(xv) }
+                             else
+                               { assoc(k, rest) }
+  }
+}
+
+sig upd_assoc : (a, b, Alist(a,b)) ~> Alist(a,b)
+fun upd_assoc(k, v, alst) {
+  switch (alst) {
+    case [] -> [(k,v)]
+    case ((xk, xv)::rest) -> if (k == xk)
+                               { (k, v) :: rest }
+                             else
+                               { (xk, xv) :: upd_assoc(k, v, rest) }
+  }
+}
+
+sig assoc_keys : (Alist(a,b)) ~> [a]
+fun assoc_keys(alst) {
+  map(fst, alst)
+}
+
+sig statemgr : (Alist(a,b), () { Ask:(a) {}-> Maybe(b)
+                               , Put:(a, b) {}-> () |e}~> c)
+               {Ask{_},Put{_}|e}~> c
+fun statemgr(state, f) {
+  shallowhandle (f()) {
+    case Return(v) -> v
+
+    case Ask(k, resume)    -> { var v = assoc(k, state);
+                                statemgr(state, fun() { resume(v) }) }
+
+    case Put(k, v, resume) -> { var state' = upd_assoc(k, v, state);
+                                statemgr(state', fun() { resume(()) }) }
+  }
+}
+
+
+sig ask : (a) {Ask:(a) {}-> b|e}~> b
+fun ask(k) { do Ask(k) }
+
+sig put : (a, b) {Put:(a, b) {}-> ()|e}~> ()
+fun put(k, v) { do Put(k, v) }
+
+fun local_state(f) { statemgr([], f) }
+
+
+############ PHYSICS ############
+
+# Vector helpers:
+
+typename Vector3 = Triple(Float);
+var zero3 = (0.0, 0.0, 0.0) : Vector3;
+typename Scalar = Float;
+
+infixl 5 +++;
+op (ux,uy,uz) +++ (vx,vy,vz) { (ux +. vx, uy +. vy, uz +. vz ) }
+infixl 5 ---;
+op (ux,uy,uz) --- (vx,vy,vz) { (ux -. vx, uy -. vy, uz -. vz ) }
+
+sig vector_sum : ([Vector3]) ~> Vector3
+fun vector_sum(lst) {
+  fold_left((+++), zero3, lst)
+}
+
+infix 5 **.;
+op s **. (x,y,z) { (s *. x, s *. y, s *. z) }
+
+sig norm2 : (Vector3) -> Float
+fun norm2((x,y,z)) {
+  x *. x +. y *. y +. z *. z
+}
+
+sig norm : (Vector3) -> Float
+fun norm(v) {
+  sqrt(norm2(v))
+}
+
+sig vector3ToString : (Vector3) -> String
+fun vector3ToString((x,y,z)) {
+  "(" ^^ floatToString(x) ^^
+  "," ^^ floatToString(y) ^^
+  "," ^^ floatToString(z) ^^
+  ")"
+}
+
+# Physical state: DSL
+
+typename Property = [| Mass
+                     | Pos
+                     | Vel |];
+
+typename Result = [| S':Scalar | V':Vector3 |];
+
+prefix 6 @!;
+sig @! : (Property) {Ask:(Property) {}-> Maybe(Result)|e}~> Result
+op @! p {
+  var v = ask(p);
+  switch (v) {
+    case Nothing -> error("Undefined symbol")
+    case Just(v) -> v
+  }
+}
+
+
+prefix 6 @!$;
+sig @!$ : (Property) {Ask:(Property) {}-> Maybe(Result)|e}~> Scalar
+op @!$ p {
+  switch(@!p) {
+    case S'(v) -> v
+    case _ -> error("Invalid scalar projection.")
+  }
+}
+
+
+prefix 6 @!>;
+sig @!> : (Property) {Ask:(Property) {}-> Maybe(Result)|e}~> Vector3
+op @!> p {
+  switch(@!p) {
+    case V'(v) -> v
+    case _ -> error("Invalid vector projection.")
+  }
+}
+
+
+infix 4 @=;
+sig @= : (Property, Result) {Put:(Property, Result) {}-> ()|e}~> ()
+op p @= v {
+  put(p, v)
+}
+
+infix 4 @=$;
+sig @=$ : (Property, Scalar) ~%~> ()
+op p @=$ s {
+  p @= S'(s)
+}
+
+infix 4 @=<;
+sig @=< : (Property, Vector3) ~%~> ()
+op p @=< v {
+  p @= V'(v)
+}
+
+infix 4 @=<+;
+sig @=<+ : (Property, Vector3) {Ask:(Property) {}-> Maybe(Result),
+                                Put:(Property, Result) {}-> ()|e}~> ()
+op p @=<+ v {
+  p @=< (@!> p) +++ v
+}
+
+infix 4 @=<-;
+sig @=<- : (Property, Vector3) {Ask:(Property) {}-> Maybe(Result),
+                                Put:(Property, Result) {}-> ()|e}~> ()
+op p @=<- v {
+  p @=< (@!> p) --- v
+}
+
+
+# Bodies:
+
+typename Body = ( mass : Float
+                , pos  : Vector3
+                , vel  : Vector3 );
+
+typename Energy = Scalar;
+
+sig body : (Body) { Ask:(Property) {}-> Maybe(Result)
+                  , Put:(Property, Result) {}-> ()
+                  , Interact:(Scalar, Vector3, Energy) {}-> (Scalar, Vector3)
+                  , Spawn:(Body) {}-> Vector3 |e}~> ()
+fun body(bd) {
+  # momentum correction obtained here
+  var delta_p = do Spawn(bd);
+
+  Mass @=$ bd.mass;
+  Pos  @=< bd.pos;
+  # (stellar) momentum correction; may not work well for multi-star systems
+  Vel  @=< bd.vel +++ ((1.0 /. bd.mass) **. delta_p);
+
+  fun advance() {
+    # TODO (future) this is inefficient the way state is implemented; but also this way
+    # of handling it is nice, because the infrastructure of state is completely invisible
+    # to the body
+    var mass = @!$ Mass;
+    var pos  = @!> Pos;
+    var vel  = @!> Vel;
+
+    var ke = mass *. norm2(vel) /. 2.0;
+
+    var (dt, delta_p) = do Interact(mass, pos, ke);
+    var vel = @!> Vel +++ ((1.0 /. mass) **. delta_p);
+
+    Vel @=< vel;
+    Pos @=<+ dt **. vel;
+
+    advance()
+  }
+
+  advance()
+}
+
+# The Physical Universe:
+
+fun handle_spawn(bodies) {
+  map(fun (b) {
+    shallowhandle(b()) {
+      case Return() -> error("Incompatible body-function.")
+      case Spawn(bd:Body, res) -> (bd, res)
+      case Interact(_,_,_,_) -> error("Incompatible body-function.")
+    }
+  }, bodies)
+}
+
+fun collect_interaction_requests(bodies) {
+  fold_left(fun ((ke, acc), b) {
+    var (e, x) = shallowhandle(b()) {
+      case Return() -> error("Incompatible body-function.")
+      case Spawn(_,_) -> error("Incompatible body-function.")
+      case Interact(mass:Scalar, pos:Vector3, ke:Energy, res) -> (ke, (mass, pos, res))
+    };
+    (ke +. e, x :: acc)
+  }, (0.0, []), bodies)
+}
+
+sig pair_interaction : (Float, (mass:Scalar,pos:Vector3), (mass:Scalar,pos:Vector3)) -> Vector3
+fun pair_interaction(dt, (pos=r1, mass=m1),
+                         (pos=r2, mass=m2)) {
+  var dr = r1 --- r2;
+  var d2 = norm2(dr);
+
+  var k = m1 *. m2 /. (d2 *. sqrt(d2));
+
+  var f12 = -. k **. dr;
+  dt **. f12
+}
+
+sig n_compose : (Int, (a) ~> (a), a) ~> (a)
+fun n_compose(n, f, x) {
+  if (n == 0)
+    x
+  else
+    n_compose(n - 1, f, f(x))
+}
+
+sig initial_correction : ([() {Spawn:(Body) -> Vector3
+                              ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+                         {Spawn{-},Interact{-}|e}~>
+                         [() {Spawn:(Body) -> Vector3
+                             ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()]
+fun initial_correction(bodies) {
+  var bodies = handle_spawn(bodies);
+
+  var dp:Vector3 = fold_left(fun (dp, (body,_)) {
+    dp --- (body.mass **. body.vel)
+  }, zero3, bodies);
+
+  var (sun, others) = fold_left(fun ((sun, others), (body,body_res)) {
+    switch (sun) {
+      case Nothing -> (Just((body, body_res)), others)
+      case Just((previous, previous_res)) ->
+        if (body.mass > previous.mass)
+          (Just((body, body_res)), (previous, previous_res) :: others)
+        else
+          (Just((previous, previous_res)), (body, body_res) :: others)
+    }
+  }, (Nothing, []), bodies);
+
+  var sun = switch(sun) {
+    case Nothing -> error("Empty system!")
+    case Just(x) -> x
+  };
+
+  # apply corrections
+  var sun = switch(sun) {
+    case (_,sun_res) -> fun () { sun_res(dp) }
+  };
+  var others = map(fun ((_,body_res))() { body_res(zero3) }, others);
+  sun :: others
+}
+
+
+sig energy_of_bodies : ([() {Spawn:(Body) -> Vector3
+                            ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+                       {Interact{-},Spawn{-}|e}~> Energy
+fun energy_of_bodies(bodies) {
+  var (energy, reqs) = collect_interaction_requests(bodies);
+  var (energy:Energy,_) = fold_left(fun ((energy, rest), (mass, pos,_)) {
+    var pe = fold_left(fun (pe, other) {
+      var dr = pos --- other.pos;
+      var d = norm(dr);
+      pe -. (mass *. other.mass /. d)
+    }, 0.0, rest);
+    (energy +. pe, (mass=mass, pos=pos) :: rest)
+  }, (energy, []), reqs);
+  energy
+}
+
+sig universe : (Int, Scalar, [() {Spawn:(Body) -> Vector3
+                                 ,Interact:(Scalar, Vector3, Energy) -> (Scalar, Vector3)|e}~> ()])
+               {Spawn{-},Interact{-}|e}~>
+               (initial_energy:Energy, final_energy:Energy)
+fun universe(n_iter, dt, bodies) {
+  var bodies = initial_correction(bodies);
+
+  # initial energy calculated after correction
+  var initial_energy = energy_of_bodies(bodies);
+
+  # simulate
+  var bodies = n_compose(n_iter, fun (bodies) {
+    var (_, reqs) = collect_interaction_requests(bodies);
+
+    var inters = fold_left(fun (inters, (mass, pos, res)) {
+      var (this_dp, inters) = fold_left(fun ((this_dp, inters), (other_mass, other_pos, other_res, other_dp)) {
+        var dp = pair_interaction(dt, (mass=mass, pos=pos),
+                                      (mass=other_mass, pos=other_pos));
+        var this_dp = this_dp +++ dp;
+        var other_dp = other_dp --- dp;
+        var inters = (other_mass, other_pos, other_res, other_dp) :: inters;
+        (this_dp, inters)
+      }, (zero3, []), inters);
+      (mass, pos, res, this_dp) :: inters
+    }, [], reqs);
+
+    map(fun ((_,_, res, dp))() { res((dt, dp)) }, inters)
+  }, bodies);
+
+  # final energy after the simulation
+  var final_energy = energy_of_bodies(bodies);
+  (initial_energy=initial_energy, final_energy=final_energy)
+}
+
+fun init_body(bd) {
+  fun () {
+    local_state(fun() { body(bd) })
+  }
+}
+
+
+fun init_system() {
+  var pi = 3.141592653589793;
+  var solar_mass = 4.0 *. pi *. pi;
+  var days_per_year = 365.24;
+
+  var bodies = [
+    # sun
+    ( mass = solar_mass
+    , pos  = zero3
+    , vel  = zero3 ),
+
+    # jupiter
+    ( mass =     9.54791938424326609e-4 *. solar_mass
+    , pos  = (   4.84143144246472090e0
+             , -.1.16032004402742839e0
+             , -.1.03622044471123109e-1 )
+    , vel  = days_per_year **.
+             (   1.66007664274403694e-3
+             ,   7.69901118419740425e-3
+             , -.6.90460016972063023e-5 )),
+
+    # saturn
+    ( mass =     2.85885980666130812e-4 *. solar_mass
+    , pos  = (   8.34336671824457987e0
+             ,   4.12479856412430479e0
+             , -.4.03523417114321381e-1 )
+    , vel  = days_per_year **.
+             ( -.2.76742510726862411e-3
+             ,   4.99852801234917238e-3
+             ,   2.30417297573763929e-5 )),
+
+    # uranus
+    ( mass =     4.36624404335156298e-5 *. solar_mass
+    , pos  = (   1.28943695621391310e1
+             , -.1.51111514016986312e1
+             , -.2.23307578892655734e-1 )
+    , vel  = days_per_year **.
+             (   2.96460137564761618e-3
+             ,   2.37847173959480950e-3
+             , -.2.96589568540237556e-5 )),
+
+    # neptune
+    ( mass =     5.15138902046611451e-5 *. solar_mass
+    , pos  = (   1.53796971148509165e1
+             , -.2.59193146099879641e1
+             ,   1.79258772950371181e-1 )
+    , vel  = days_per_year **.
+             (   2.68067772490389322e-3
+             ,   1.62824170038242295e-3
+             , -.9.51592254519715870e-5 ))
+  ];
+
+  map(init_body, bodies)
+}
+
+
+############ PROGRAM ENTRY ############
+
+fun simulation(n, dt) {
+  var (initial_energy=ie, final_energy=fe) = universe(n, dt, init_system());
+  println(floatToString(ie));
+  println(floatToString(fe))
+}
+
+typename Configuration = [| Correctness | Performance |];
+
+sig run_sim : (Configuration) ~%~> ()
+fun run_sim(config) {
+  var n = switch(config) {
+    case Correctness -> 1000
+    case Performance -> 50000000
+  };
+  var dt = 0.01;
+  simulation(n, dt)
+}
+
+fun main() {
+  run_sim(Correctness)
+}
