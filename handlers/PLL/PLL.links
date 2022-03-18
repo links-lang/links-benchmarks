@@ -1,0 +1,215 @@
+sig fst : ((a, b)) -> a
+fun fst((a, _)) {a}
+
+sig snd : ((a, b)) -> b
+fun snd((_, b)) {b}
+
+sig first : ((a) -> c, (a, b)) -> (c, b)
+fun first(f, (a, b)) {(f(a), b)}
+
+sig second : ((b) -> c, (a, b)) -> (a, c)
+fun second(f, (a, b)) {(a, f(b))}
+
+typename Comp(e :: Eff, a) = () ~e~> a;
+
+sig run : (Comp({}, a)) {}~> a
+fun run(m) {
+  handle(m()) {
+    case Return(x) -> x
+  }
+}
+
+sig get : () {Get : s | _}-> s
+fun get() {do Get}
+
+sig put : (s) {Put : (s) {}-> () | _}-> ()
+fun put(s) {do Put(s)}
+
+sig runState : (s) -> (Comp({Get : s, Put : (s) {}-> () | e}, a)) -> Comp({Get{_}, Put{_} | e}, (a, s))
+fun runState(s)(m)() {
+  (handle(m()) {
+    case Return(x) -> fun(s) {(x, s)}
+    case Get(k) -> fun(s) {k(s)(s)}
+    case Put(p, k) -> fun(_) {k(())(p)}
+  })(s)
+}
+
+sig evalState : (s) -> (Comp({Get : s, Put : (s) {}-> () | e}, a)) -> Comp({Get{_}, Put{_} | e}, a)
+fun evalState(s)(m)() {
+  fst(runState(s)(m)())
+}
+
+sig tell : ([w]) {Tell : ([w]) {}-> () | _}-> ()
+fun tell(w) {do Tell(w)}
+
+sig runWriter : (Comp({Tell : ([w]) {}-> () | e}, a)) -> Comp({Tell{_} | e}, (a, [w]))
+fun runWriter(m)() {
+  handle(m()) {
+    case Return(x) -> (x, [])
+    case Tell(w, k) -> second(fun(p) {w ++ p}, k(()))
+  }
+}
+
+##################################################################################################
+
+#   debug     debug      debug   debug
+#     v         v          v       v
+# in --> mixer --> filter --> vco --> out
+#          |                   |
+#          '---------<---------'
+
+typename VCOOut = (Float, Float);
+typename FilterState = [Float];
+typename UIR = [Float];
+typename Sample = Float;
+
+sig pi : Float
+var pi = 3.141592653589793238;
+
+sig sumFloat : ([Float]) ~> Float
+fun sumFloat(xs) {
+  fold_left((+.), 0.0, xs)
+}
+
+sig avgFloat : ([Float]) ~> Float
+fun avgFloat(xs) {
+  sumFloat(xs) /. intToFloat(length(xs))
+}
+
+sig hamming : (Int) ~> [Float]
+fun hamming(m) {
+  fun hammingWindow(n) {0.54 +. 0.46 *. cos(pi *. n /. intToFloat(m))}
+  map(compose(hammingWindow, intToFloat), [-m .. m])
+}
+
+sig idealLPF : (Float, Int) ~> [Float]
+fun idealLPF(w, s) {
+  fun sinc(x) {
+    switch(x) {
+      case 0.0 -> w /. pi
+      case n -> sin(w *. n) /. (pi *. n)
+    }
+  }
+  map(compose(sinc, intToFloat), [-s .. s])
+}
+
+sig normalize : ([Float]) ~> [Float]
+fun normalize(xs) {
+  map(fun(x) {x /. sumFloat(xs)}, xs)
+}
+
+sig fir1 : (Float, Int) ~> [Float]
+fun fir1(w, n) {
+  var window = hamming(n);
+  var coeff = idealLPF(w *. pi, n);
+  normalize(map(fun((a, b)) { a *. b}, zip(window, coeff)))
+}
+
+sig mixer : (Sample) -> (Sample) -> Sample
+fun mixer(s)(input) {negatef(s) *. input}
+
+sig pointwiseFilter : (UIR) -> (Sample) 
+  {Get : (Filter : FilterState | b) , Put : ((Filter : FilterState | b)) -> () | _}~> Sample
+fun pointwiseFilter(uir)(input) {
+  switch(uir) {
+    case [] -> 0.0
+    case x :: xs -> {
+      var (p :: ps) = get().Filter;
+      var now = map(fun((a, b)) { a +. b}, zip(ps ++ [0.0], map(fun(a) {a *. input}, xs)));
+      var result = input *. x +. p;
+      put((get() with Filter = now));
+      result
+    }
+  }
+}
+
+sig vco : (Float, Float) -> (Sample) 
+  {Get : (VCO : VCOOut | b), Put : ((VCO : VCOOut | b)) -> () | _}-> Sample
+fun vco(f0, alpha)(input) {
+  var (c, s) = get().VCO;
+  var omega = 2.0 *. pi *. (f0 +. alpha *. input);
+  var (cout, sout) = (cos(omega) *. c -. sin(omega) *. s, cos(omega) *. s +. sin(omega) *. c);
+  put((get() with VCO = (cout, sout)));
+  c
+}
+
+sig pll : (Float, Float) -> (UIR) -> (Sample) 
+  {Get : (Filter : FilterState, VCO : VCOOut | c),
+   Put : ((Filter : FilterState, VCO : VCOOut | c)) -> () | _}~> Sample
+fun pll(f0, alpha)(uir)(input) {
+ var (_, s) = get().VCO;
+ var filterIn = mixer(s)(input);
+ var filterOut = pointwiseFilter(uir)(filterIn);
+ vco(f0, alpha)(filterOut)
+}
+
+fun runpll(f0, alpha)(fM)(seq) {
+  run -<- evalState((Filter = replicate(2 * fM + 1, 0.0), VCO = (1.0, 0.0))) $ 
+  fun() {map(pll(f0, alpha)(fir1(f0, fM)), seq)}
+}
+
+var signal = map(fun(n) {cos(2.0 *. pi *. 0.1 *. intToFloat(n) +. pi /. 3.0)}, [0 .. 499]);
+
+fun pointwiseFilter1(uir)(input) {
+  switch(uir) {
+    case [] -> 0.0
+    case x :: xs -> {
+      var (p :: ps) = get();
+      var now = map(fun((a, b)) { a +. b}, zip(ps ++ [0.0], map(fun(a) {a *. input}, xs)));
+      var result = input *. x +. p;
+      put(now);
+      result
+    }
+  }
+}
+
+fun vco1(f0, alpha)(input) {
+  var (c, s) = get();
+  var omega = 2.0 *. pi *. (f0 +. alpha *. input);
+  var (cout, sout) = (cos(omega) *. c -. sin(omega) *. s, cos(omega) *. s +. sin(omega) *. c);
+  put((cout, sout));
+  c
+}
+
+fun filterWrap(m)() {
+  handle(m()) {
+    case Return(x) -> x
+    case Get(k) -> {
+      var v = get().Filter;
+      k(v)
+    }
+    case Put(p, k) -> {
+      var v = put((get() with Filter = p));
+      k(v)
+    }
+  }
+}
+
+fun vcoWrap(m)() {
+  handle(m()) {
+    case Return(x) -> x
+    case Get(k) -> {
+      var v = get().VCO;
+      k(v)
+    }
+    case Put(p, k) -> {
+      var v = put((get() with VCO = p));
+      k(v)
+    }
+  }
+}
+
+fun pll1(f0, alpha)(uir)(input) {
+ var (_, s) = get().VCO;
+ var filterIn = mixer(s)(input);
+ var filterOut = (filterWrap $ fun() {pointwiseFilter1(uir)(filterIn)})();
+ (vcoWrap $ fun() {vco1(f0, alpha)(filterOut)})()
+}
+
+fun out(x) {tell([x])}
+
+fun outWrap(m)() {
+  handle(m()) {
+    case Return(x) -> out(x); x
+  }
+}
