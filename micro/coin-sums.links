@@ -1,0 +1,23 @@
+# Coin sum problem:
+# Compute the number of paths that sum to 250 using coins with given denomination.
+#
+# References:
+# Trizen's implementation of the same problem in Python:
+# https://github.com/trizen/language-benchmarks/blob/master/Interpreted/coin-sums/csum.py
+
+
+sig numPaths : (Int, Int) ~> Int
+fun numPaths(startSum, lastCoin) {
+    if (startSum == 250) 1
+    else {
+        var coins = [1,2,5,10,20,50,100,200];
+        var paths = for (coin <- coins) where ((lastCoin>=coin) && (startSum<=(250-coin))) [numPaths(startSum+coin, coin)];
+        sum(paths)
+    }   
+}
+
+
+sig main : () ~> ()
+fun main() {
+    println(intToString(numPaths(0, 250)))
+}
