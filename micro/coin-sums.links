@@ -19,5 +19,5 @@ fun num_paths(startsum, lastcoin) {
 
 sig main : () ~> ()
 fun main() {
-    println(intToString(num_paths(0, 250)))
+    println(intToString(numPaths(0, 250)))
 }
