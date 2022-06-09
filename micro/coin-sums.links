@@ -7,7 +7,7 @@
 
 
 sig numPaths : (Int, Int) ~> Int
-fun num_paths(startsum, lastcoin) {
+fun numPaths(startsum, lastcoin) {
     if (startsum == 250) 1
     else {
         var coins = [1,2,5,10,20,50,100,200];
