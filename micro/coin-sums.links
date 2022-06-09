@@ -6,7 +6,7 @@
 # https://github.com/trizen/language-benchmarks/blob/master/Interpreted/coin-sums/csum.py
 
 
-sig num_paths : (Int, Int) ~> Int
+sig numPaths : (Int, Int) ~> Int
 fun num_paths(startsum, lastcoin) {
     if (startsum == 250) 1
     else {
