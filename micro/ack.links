@@ -1,0 +1,17 @@
+# Ackermann function
+#
+# Reference:
+# Trizen's implementation of the same problem in Python:
+# https://github.com/trizen/language-benchmarks/blob/master/Interpreted/ackermann-function/ack.py
+
+sig ack : (Int, Int) ~> Int
+fun ack(m, n) {
+    if (m == 0)  (n + 1)
+    else if (n == 0) ack(m-1, 1)
+    else ack(m-1, ack(m, n-1))
+}
+
+sig main : () ~> ()
+fun main() {
+    println(intToString(ack(3, 9)))
+}
