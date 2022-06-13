@@ -85,3 +85,5 @@ fun main() {
     var n = 50;
     println(floatToString(approximate(n)))
 }
+
+main()
