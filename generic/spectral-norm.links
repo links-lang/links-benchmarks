@@ -1,0 +1,89 @@
+# Spectral-norm benchmark
+# 
+# Calculate the spectral norm of an infinite matrix A, 
+# with entries a11=1, a12=1/2, a21=1/3, a13=1/4, a22=1/5, a31=1/6, etc
+#
+# References:
+# https://benchmarksgame-team.pages.debian.net/benchmarksgame/description/spectralnorm.html#spectralnorm
+# Jarkko Miettinen and Isaac Gouy's implementation of the same problem in Java:
+# https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/spectralnorm-java-1.html
+
+
+
+typename Matrix = [[Float]];
+
+sig fold_left2 : ((a, b, c) ~e~> a, a, [b], [c]) ~e~> a
+fun fold_left2(f, z, bs, cs) {
+    switch ((bs, cs)) {
+        case ([], []) -> z
+        case (b :: bs, c :: cs) -> fold_left2(f, f(z,b,c), bs, cs)
+        case _ -> error("length mismatch")
+    }
+}
+
+sig multiplyAv : ([Float], Matrix) ~> [Float]
+fun multiplyAv(v, av) {
+    var av' = fold_left(fun(av', arow) {
+        var ai = fold_left2(fun(acc, vj, ax) {
+            acc +. ax *. vj
+        }, 0.0, v, arow);
+        ai :: av'
+    }, [], av);
+    reverse(av')
+}
+
+
+sig multiplyAtAv : ([Float], Matrix, Matrix) ~> [Float]
+fun multiplyAtAv(v, av, at) {
+    var u = multiplyAv(v, av);
+    multiplyAv(u, at)
+}
+
+sig generateA : (Int) ~> [[Float]]
+fun generateA(n) {
+    for (i <- [0 .. n-1]) [ for (j <- [0 .. n-1]) [1.0 /. intToFloat((i+j)*(i+j+1)/2+i+1)]]
+}
+
+sig generateAt : (Int) ~> [[Float]]
+fun generateAt(n) {
+    for (j <- [0 .. n-1]) [ for (i <- [0 .. n-1]) [1.0 /. intToFloat((i+j)*(i+j+1)/2+i+1)]]
+}
+
+sig generateEigenV : ([Float], [Float]) ~> Float
+fun generateEigenV(u, v) {
+    var uv = fold_left2(fun(acc, ui, vi) {
+            acc +. ui *. vi
+        }, 0.0, u, v);
+    var vv = fold_left2(fun(acc, ui, vi) {
+            acc +. ui *. vi
+        }, 0.0, u, u);
+    uv /. vv
+}
+
+sig recMultiAtav : (Int, [Float], Matrix, Matrix) ~> [Float]
+fun recMultiAtav(n, u, av, at){
+    if (n == 0) u
+    else {
+        var atav = multiplyAtAv(u, av, at);
+        recMultiAtav((n-1), atav, av, at)
+    } 
+}
+
+sig approximate : (Int) ~> Float
+fun approximate(n) {
+    var u = for (i <- [1 .. n]) [1.0];
+    var av = generateA(n);
+    var at = generateAt(n);
+    var u = recMultiAtav(9, u, av, at);
+    var v = multiplyAtAv(u, av, at);
+    var eigen = generateEigenV(u, v);
+    sqrt(eigen)
+}
+
+sig main : () ~>  ()
+fun main() {
+    var n = 50;
+    println(floatToString(approximate(n)))
+}
+
+main()
