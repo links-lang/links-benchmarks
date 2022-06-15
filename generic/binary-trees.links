@@ -1,0 +1,60 @@
+# Binary trees 
+#
+# References:
+# Benchmark game: binary-trees
+# https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-ocaml-2.html
+# Corentin Risselin's implementation of the same problem in Python
+# https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-python3-5.html
+# Troestler Christophe's implementation of the same problem in Python
+# https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-ocaml-2.html
+
+
+typename Tree = [|Node:(Tree, Tree)|Nil|];
+
+sig makeTree : (Int) ~> Tree
+fun makeTree(d) {
+    if (d == 0) Node(Nil, Nil)
+    else Node(makeTree(d-1), makeTree(d-1))
+}
+
+sig checkNode : (Tree) ~> Int
+fun checkNode(tree) {
+    switch (tree) {
+        case Nil -> 0
+        case Node(l, r) -> 1 + checkNode(l) + checkNode(r)
+    }
+}
+
+sig run : (Int) ~> Int
+fun run(d) {
+    checkNode(makeTree(d))
+}
+
+sig loopDepth : (Int, Int, Int) ~> ()
+fun loopDepth(d, maxDepth, minDepth) {
+    var treeCount = 2 ^ (maxDepth + minDepth - d);
+    var dTreeCount = for (i <- [1 .. treeCount]) [d];
+    var checkSum = sum(map(run, dTreeCount));
+    var message = intToString(treeCount) ^^ "\t trees of depth " ^^ intToString(d) ^^ "\t check: " ^^ intToString(checkSum);
+    println(message)
+}
+
+
+sig main : () ~> ()
+fun main() {
+    var minDepth = 4;
+    var maxDepth = 21;
+    var stretchDepth = maxDepth + 1;
+
+    var checkStretch = checkNode(makeTree(stretchDepth));
+    println("stretch tree of depth " ^^ intToString(stretchDepth) ^^ "\t check: " ^^ intToString(checkStretch));
+
+    var longLivedTree = makeTree(maxDepth);
+    var testDepth = for (i <- [0 .. (stretchDepth - minDepth)/2]) [minDepth + 2*i];
+    var dummy = for (d <- testDepth) [loopDepth(d, maxDepth, minDepth)];
+    println("long lived tree of depth " ^^ intToString(maxDepth) ^^ "\t check: " ^^ intToString(checkNode(longLivedTree)))
+}
+
+main()
+
+
