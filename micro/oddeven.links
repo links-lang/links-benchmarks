@@ -25,5 +25,7 @@ fun boolToString(b) {
 
 sig main : () ~> ()
 fun main() {
-  println(boolToString(even(12345678)))
+  println(boolToString(even(stringToInt(getArgs() !! 0))))
 }
+
+main()

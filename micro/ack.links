@@ -13,5 +13,8 @@ fun ack(m, n) {
 
 sig main : () ~> ()
 fun main() {
-    println(intToString(ack(3, 9)))
+    # Default input arguments: 3 9
+    println(intToString(ack(stringToInt(getArgs() !! 0), stringToInt(getArgs() !! 1))))
 }
+
+main()

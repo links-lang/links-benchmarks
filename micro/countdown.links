@@ -11,5 +11,7 @@ fun countdown(n, m) {
 
 sig main : () ~> ()
 fun main() {
-  println(intToString(countdown(10000000, 0)))
+  println(intToString(countdown(stringToInt(getArgs() !! 0), 0)))
 }
+
+main()

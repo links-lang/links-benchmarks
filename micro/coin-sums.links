@@ -1,6 +1,9 @@
 # Coin sum problem:
 # Compute the number of paths that sum to 250 using coins with given denomination.
 #
+# Input: 
+# Int in range [0, 250]
+#
 # References:
 # Trizen's implementation of the same problem in Python:
 # https://github.com/trizen/language-benchmarks/blob/master/Interpreted/coin-sums/csum.py
@@ -19,5 +22,8 @@ fun numPaths(startSum, lastCoin) {
 
 sig main : () ~> ()
 fun main() {
-    println(intToString(numPaths(0, 250)))
+    # Default input arguments: 0
+    println(intToString(numPaths(stringToInt(getArgs() !! 0), 250)))
 }
+
+main()
