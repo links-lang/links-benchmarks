@@ -5,7 +5,7 @@
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-ocaml-2.html
 # Corentin Risselin's implementation of the same problem in Python
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-python3-5.html
-# Troestler Christophe's implementation of the same problem in Python
+# Troestler Christophe's implementation of the same problem in OCaml
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/binarytrees-ocaml-2.html
 
 
@@ -43,7 +43,8 @@ fun loopDepth(d, maxDepth, minDepth) {
 sig main : () ~> ()
 fun main() {
     var minDepth = 4;
-    var maxDepth = 21;
+    var requestedMaxDepth = stringToInt(getArgs() !! 0);
+    var maxDepth = fromJust(max([(minDepth + 2),requestedMaxDepth]));
     var stretchDepth = maxDepth + 1;
 
     var checkStretch = checkNode(makeTree(stretchDepth));
