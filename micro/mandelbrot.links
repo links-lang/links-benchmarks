@@ -6,6 +6,7 @@
 var bailout = 16.0;
 var max_iterations = 200;
 
+sig mandelbrot : (Float, Float) ~> Int
 fun mandelbrot(x, y) {
   var cr = y -. 0.5;
   var ci = x;
@@ -28,6 +29,7 @@ fun mandelbrot(x, y) {
 
 # mean number of iterations across a sample of n*n uniformly
 # distributed points in a square
+sig meanMandlebrot : (Int) ~> Float
 fun meanMandlebrot(n) {
   fun sample(x, y, a, n) {
     if (y >= n) {
@@ -42,3 +44,10 @@ fun meanMandlebrot(n) {
 
   sample(0, 0, 0, n)
 }
+
+sig main : () ~> ()
+fun main() {
+  println(floatToString(meanMandlebrot(stringToInt(getArgs() !! 0))))
+}
+
+main()
