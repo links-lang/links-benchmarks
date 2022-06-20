@@ -44,7 +44,7 @@ sig main : () ~> ()
 fun main() {
     var minDepth = 4;
     var requestedMaxDepth = stringToInt(getArgs() !! 0);
-    var maxDepth = fromJust(max([(minDepth + 2),requestedMaxDepth]));
+    var maxDepth = maximum(minDepth + 2, requestedMaxDepth);
     var stretchDepth = maxDepth + 1;
 
     var checkStretch = checkNode(makeTree(stretchDepth));
