@@ -22,7 +22,6 @@ fun numPaths(startSum, lastCoin) {
 
 sig main : () ~> ()
 fun main() {
-    # Default input arguments: 0
     println(intToString(numPaths(stringToInt(getArgs() !! 0), 250)))
 }
 
