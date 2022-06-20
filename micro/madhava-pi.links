@@ -31,3 +31,11 @@ sig madhavaPi : (Int) ~> Float
 fun madhavaPi(n) {
   4.0 *. pos(0.0, 0.0, intToFloat(n))
 }
+
+
+sig main : () ~> ()
+fun main() {
+  println(floatToString(madhavaPi(stringToInt(getArgs() !! 0))))
+}
+
+main()

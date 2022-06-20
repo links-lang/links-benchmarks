@@ -82,7 +82,7 @@ fun approximate(n) {
 
 sig main : () ~>  ()
 fun main() {
-    var n = 50;
+    var n = stringToInt(getArgs() !! 0);
     println(floatToString(approximate(n)))
 }
 

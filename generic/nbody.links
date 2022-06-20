@@ -219,3 +219,5 @@ fun run_sim(setting) {
 fun main() {
   run_sim(Correctness)
 }
+
+main()

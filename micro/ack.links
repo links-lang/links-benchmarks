@@ -13,5 +13,8 @@ fun ack(m, n) {
 
 sig main : () ~> ()
 fun main() {
-    println(intToString(ack(3, 9)))
+    var [m,n] = getArgs();
+    println(intToString(ack(stringToInt(m), stringToInt(n))))
 }
+
+main()

@@ -213,7 +213,8 @@ fun atkin(limit) {
 
 sig main : () ~> ()
 fun main() {
-  var primes = atkin(100);
+  var limit = stringToInt(getArgs() !! 0);
+  var primes = atkin(limit);
   println(fold_right((^^), "", intersperse(", ", map(intToString, primes))))
 }
 
